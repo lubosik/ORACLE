@@ -72,6 +72,8 @@ export async function upsertSeenLead(lead) {
       website: lead.companyWebsite,
       linkedin_url: lead.linkedinUrl,
       country: lead.country,
+      employee_count: lead.employeeCount || null,
+      company_size_bucket: lead.companySizeBucket || null,
       source: 'apify'
     }, { onConflict: 'email' });
 

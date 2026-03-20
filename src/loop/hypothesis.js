@@ -29,7 +29,58 @@ function buildTimingSection(timingInsights, currentSchedule) {
   return lines.length ? lines.join('\n') : '';
 }
 
-export async function generateHypothesis(ledgerEntries, currentBaseline, timingInsights = null, currentSchedule = null) {
+function buildIntelligenceSection(intelligence) {
+  if (!intelligence) return '';
+  const lines = [];
+
+  if (intelligence.replyAnalysis) {
+    const ra = typeof intelligence.replyAnalysis === 'string' ? JSON.parse(intelligence.replyAnalysis) : intelligence.replyAnalysis;
+    if (ra.winning_angles?.length) {
+      lines.push('REPLY ANALYSIS — WINNING COPY ANGLES (from real replies):');
+      ra.winning_angles.forEach(a => lines.push(`  - ${a}`));
+    }
+    if (ra.top_objections?.length) {
+      lines.push('TOP OBJECTIONS TO ADDRESS:');
+      ra.top_objections.forEach(o => lines.push(`  - ${o}`));
+    }
+    if (ra.suggested_copy_focus) {
+      lines.push(`SUGGESTED COPY FOCUS: ${ra.suggested_copy_focus}`);
+    }
+  }
+
+  if (intelligence.stepAttribution) {
+    const sa = typeof intelligence.stepAttribution === 'string' ? JSON.parse(intelligence.stepAttribution) : intelligence.stepAttribution;
+    if (sa.best_step) {
+      lines.push(`\nSTEP ATTRIBUTION — Most replies come from ${sa.best_step.replace('_', ' ')}:`);
+      for (const k of ['step_1', 'step_2', 'step_3', 'step_4']) {
+        if (sa[k]) lines.push(`  ${k}: ${sa[k].positive_replies} positive replies (${(sa[k].positive_rate * 100).toFixed(1)}%)`);
+      }
+    }
+  }
+
+  if (intelligence.cohortAnalysis) {
+    const ca = typeof intelligence.cohortAnalysis === 'string' ? JSON.parse(intelligence.cohortAnalysis) : intelligence.cohortAnalysis;
+    if (ca.ideal_prospect) {
+      lines.push(`\nCOHORT ANALYSIS — Ideal prospect: ${ca.ideal_prospect}`);
+      if (ca.avoid) lines.push(`  Avoid: ${ca.avoid}`);
+    }
+  }
+
+  if (intelligence.winnerSynthesis) {
+    const ws = intelligence.winnerSynthesis;
+    if (ws.new_baseline_elements?.meta_insight) {
+      lines.push(`\nWINNER META-INSIGHT: ${ws.new_baseline_elements.meta_insight}`);
+    }
+    if (ws.new_baseline_elements?.key_principles?.length) {
+      lines.push('KEY PROVEN PRINCIPLES:');
+      ws.new_baseline_elements.key_principles.forEach(p => lines.push(`  - ${p}`));
+    }
+  }
+
+  return lines.length ? lines.join('\n') : '';
+}
+
+export async function generateHypothesis(ledgerEntries, currentBaseline, timingInsights = null, currentSchedule = null, intelligence = null) {
   let programMd = '';
   try {
     programMd = await readFile(join(__dirname, '../program.md'), 'utf8');
@@ -48,6 +99,7 @@ export async function generateHypothesis(ledgerEntries, currentBaseline, timingI
     : 'Not yet established';
 
   const timingSection = buildTimingSection(timingInsights, currentSchedule);
+  const intelligenceSection = buildIntelligenceSection(intelligence);
 
   const message = await anthropic.messages.create({
     model: 'claude-sonnet-4-20250514',
@@ -64,7 +116,7 @@ CURRENT BASELINE POSITIVE REPLY RATE: ${baselineRate}
 RECENT EXPERIMENT LEDGER (last 10):
 ${ledgerSummary}
 
-${timingSection ? timingSection + '\n' : ''}
+${timingSection ? timingSection + '\n' : ''}${intelligenceSection ? intelligenceSection + '\n' : ''}
 Propose ONE specific, testable change that you believe will improve positive reply rate. You may test either copy changes OR sending schedule changes based on the data above. Be concrete and data-driven.
 
 If proposing a schedule change, set change_type to "send_schedule" and populate schedule_changes with the new values. Leave instructions_for_copywriter as null.

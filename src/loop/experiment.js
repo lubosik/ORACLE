@@ -5,7 +5,8 @@ import { sendTelegram } from '../telegram/bot.js';
 import { collectTimingInsights } from '../analytics/tracker.js';
 import { getSetting, setSetting, getSchedule } from '../utils/settings.js';
 import { logActivity } from '../utils/activity.js';
-import { BASE_SEQUENCE } from '../sequences/base_sequence.js';
+import { updateBanditOutcome } from './multi_armed_bandit.js';
+import { getLatestSynthesis } from './winner_synthesizer.js';
 import logger from '../utils/logger.js';
 import { supabase } from '../utils/supabase.js';
 import 'dotenv/config';
@@ -26,7 +27,22 @@ export async function runExperimentLoop() {
     const ledger = await getRecentExperiments(10);
     const baseline = await getCurrentBaseline('real_estate');
 
-    const hypothesis = await generateHypothesis(ledger, baseline, timingInsights, currentSchedule);
+    // Load all intelligence signals for richer hypothesis generation
+    const [replyAnalysisRaw, stepAttributionRaw, cohortAnalysisRaw] = await Promise.all([
+      getSetting('reply_analysis', null),
+      getSetting('step_attribution', null),
+      getSetting('cohort_analysis', null)
+    ]);
+    const winnerSynthesis = await getLatestSynthesis();
+
+    const intelligence = {
+      replyAnalysis: replyAnalysisRaw ? JSON.parse(replyAnalysisRaw) : null,
+      stepAttribution: stepAttributionRaw ? JSON.parse(stepAttributionRaw) : null,
+      cohortAnalysis: cohortAnalysisRaw ? JSON.parse(cohortAnalysisRaw) : null,
+      winnerSynthesis
+    };
+
+    const hypothesis = await generateHypothesis(ledger, baseline, timingInsights, currentSchedule, intelligence);
 
     // If this is a schedule experiment, temporarily apply the proposed schedule
     // and store the original so we can revert if it loses
@@ -175,6 +191,9 @@ export async function scoreActiveExperiments() {
           outcome,
           notes: null
         });
+
+        // Update Thompson sampling bandit state
+        await updateBanditOutcome(exp.variant_id, outcome);
 
         if (outcome === 'winner') {
           await promoteToBaseline(exp.variant_id, positiveReplyRate, null, 'real_estate');

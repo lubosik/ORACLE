@@ -4,6 +4,28 @@ import { logActivity } from '../utils/activity.js';
 import logger from '../utils/logger.js';
 import 'dotenv/config';
 
+function getCompanySizeBucket(count) {
+  if (!count || count <= 0) return 'unknown';
+  if (count <= 10)   return 'micro';
+  if (count <= 50)   return 'small';
+  if (count <= 100)  return 'mid';
+  if (count <= 500)  return 'growth';
+  if (count <= 1000) return 'large';
+  return 'enterprise';
+}
+
+// Some Apollo outputs use string ranges like "11 - 50"
+function parseEmployeeCount(raw) {
+  if (!raw) return null;
+  if (typeof raw === 'number') return raw;
+  const str = String(raw).replace(/,/g, '');
+  // Range like "11 - 50" → take midpoint
+  const rangeMatch = str.match(/(\d+)\s*[-–]\s*(\d+)/);
+  if (rangeMatch) return Math.round((parseInt(rangeMatch[1]) + parseInt(rangeMatch[2])) / 2);
+  const num = parseInt(str);
+  return isNaN(num) ? null : num;
+}
+
 const client = new ApifyClient({ token: process.env.APIFY_API_TOKEN });
 
 export async function scrapeLeads(vertical = 'real_estate') {
@@ -25,17 +47,24 @@ export async function scrapeLeads(vertical = 'real_estate') {
   const run = await client.actor(process.env.APIFY_ACTOR_ID).call(input);
   const { items } = await client.dataset(run.defaultDatasetId).listItems();
 
-  const allLeads = items.map(item => ({
-    firstName: item.firstName || item.first_name || '',
-    lastName: item.lastName || item.last_name || '',
-    email: (item.email || '').toLowerCase().trim(),
-    companyName: item.companyName || item.company_name || item.organization || '',
-    companyWebsite: item.companyWebsite || item.company_website || item.website || '',
-    linkedinUrl: item.linkedinUrl || item.linkedin_url || item.linkedin || '',
-    title: item.title || item.jobTitle || item.job_title || '',
-    city: item.city || '',
-    country: item.country || ''
-  }));
+  const allLeads = items.map(item => {
+    const rawCount = item.numEmployees || item.employee_count || item.employeeCount ||
+                     item.companySize || item.company_size || item.employees || null;
+    const employeeCount = parseEmployeeCount(rawCount);
+    return {
+      firstName: item.firstName || item.first_name || '',
+      lastName: item.lastName || item.last_name || '',
+      email: (item.email || '').toLowerCase().trim(),
+      companyName: item.companyName || item.company_name || item.organization || '',
+      companyWebsite: item.companyWebsite || item.company_website || item.website || '',
+      linkedinUrl: item.linkedinUrl || item.linkedin_url || item.linkedin || '',
+      title: item.title || item.jobTitle || item.job_title || '',
+      city: item.city || '',
+      country: item.country || '',
+      employeeCount,
+      companySizeBucket: getCompanySizeBucket(employeeCount)
+    };
+  });
 
   const noEmailCount = allLeads.filter(l => !l.email).length;
   const withEmail = allLeads.filter(l => l.email && l.email.trim() !== '');

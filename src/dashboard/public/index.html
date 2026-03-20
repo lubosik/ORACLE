@@ -1493,9 +1493,107 @@
     </div>
   </div>
 
+  <!-- ============================================================ -->
+  <!-- RESEARCH INTELLIGENCE                                         -->
+  <!-- ============================================================ -->
+  <div class="section-full" id="research-section">
+    <div class="section-heading">
+      <h2>Research Intelligence</h2>
+      <div class="section-line"></div>
+      <div class="card-badge" id="research-badge">Karpathy Loop</div>
+    </div>
+
+    <!-- Row: ICP + Cohort Analysis -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;" class="research-grid">
+
+      <div class="card" style="padding:20px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+          <div style="font-family:var(--font-display);font-size:13px;letter-spacing:0.08em;color:var(--crystal);">ICP PERFORMANCE</div>
+          <div class="card-badge" id="icp-badge">top cohorts</div>
+        </div>
+        <div id="icp-cohorts" style="font-size:12px;">
+          <div class="empty-state" style="padding:12px 0;">Gathering cohort data...</div>
+        </div>
+        <div id="refined-icp-box" style="display:none;margin-top:12px;padding:10px 12px;background:rgba(124,92,252,0.07);border:1px solid rgba(124,92,252,0.15);border-radius:8px;font-size:11px;line-height:1.6;color:var(--text-secondary);">
+          <div style="font-size:10px;letter-spacing:0.08em;color:var(--violet-bright);margin-bottom:4px;">REFINED ICP</div>
+          <div id="refined-icp-text"></div>
+        </div>
+      </div>
+
+      <div class="card" style="padding:20px;">
+        <div style="font-family:var(--font-display);font-size:13px;letter-spacing:0.08em;color:var(--crystal);margin-bottom:14px;">REPLY ANALYSIS</div>
+        <div id="reply-analysis-content">
+          <div class="empty-state" style="padding:12px 0;">Classifying replies...</div>
+        </div>
+        <div style="margin-top:14px;">
+          <div style="font-family:var(--font-display);font-size:11px;letter-spacing:0.08em;color:var(--amber);margin-bottom:8px;">STEP ATTRIBUTION</div>
+          <div id="step-attribution-bars" style="display:grid;gap:6px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row: Winner Synthesis + Deliverability -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;" class="research-grid">
+
+      <div class="card" style="padding:20px;">
+        <div style="font-family:var(--font-display);font-size:13px;letter-spacing:0.08em;color:var(--crystal);margin-bottom:14px;">WINNER SYNTHESIS</div>
+        <div id="winner-synthesis-content">
+          <div class="empty-state" style="padding:12px 0;">Awaiting 3+ winners...</div>
+        </div>
+      </div>
+
+      <div class="card" style="padding:20px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+          <div style="font-family:var(--font-display);font-size:13px;letter-spacing:0.08em;color:var(--crystal);">DELIVERABILITY</div>
+          <div class="card-badge" id="deliverability-badge">open rate watch</div>
+        </div>
+        <div id="deliverability-content">
+          <div class="empty-state" style="padding:12px 0;">No anomalies detected</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row: Verticals + Bandit State -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;" class="research-grid">
+
+      <div class="card" style="padding:20px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+          <div style="font-family:var(--font-display);font-size:13px;letter-spacing:0.08em;color:var(--crystal);">VERTICAL EXPANSION</div>
+          <div class="card-badge">AI research</div>
+        </div>
+        <div id="verticals-content">
+          <div class="empty-state" style="padding:12px 0;">Researching opportunities...</div>
+        </div>
+      </div>
+
+      <div class="card" style="padding:20px;">
+        <div style="font-family:var(--font-display);font-size:13px;letter-spacing:0.08em;color:var(--crystal);margin-bottom:14px;">THOMPSON SAMPLING (MAB)</div>
+        <div id="bandit-content">
+          <div class="empty-state" style="padding:12px 0;">No variant trials yet</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Program Evolution -->
+    <div class="card" style="padding:20px;margin-bottom:4px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <div style="font-family:var(--font-display);font-size:13px;letter-spacing:0.08em;color:var(--crystal);">RESEARCH PROGRAM</div>
+        <div class="card-badge" id="program-evolution-badge">self-evolving</div>
+      </div>
+      <div id="program-content" style="font-family:var(--font-mono);font-size:11px;color:var(--text-secondary);white-space:pre-wrap;line-height:1.7;max-height:320px;overflow-y:auto;padding:12px;background:rgba(255,255,255,0.02);border-radius:8px;border:1px solid rgba(255,255,255,0.06);">Loading...</div>
+      <div id="evolution-history" style="margin-top:10px;"></div>
+    </div>
+
+  </div>
+
 </div>
 
 <style>
+/* Research grid responsive */
+@media (max-width: 768px) {
+  .research-grid { grid-template-columns: 1fr !important; }
+}
+
 /* Activity feed styles */
 .activity-filter {
   background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);
@@ -2439,7 +2537,8 @@
     pipeline: 'PIPELINE', scraping: 'SCRAPING', enrichment: 'ENRICH',
     verification: 'VERIFY', copy: 'COPY', draft: 'DRAFT',
     approval: 'APPROVAL', campaign: 'CAMPAIGN', experiment: 'EXPERIMENT',
-    analytics: 'ANALYTICS', inbox: 'INBOX', error: 'ERROR', system: 'SYSTEM'
+    analytics: 'ANALYTICS', inbox: 'INBOX', error: 'ERROR', system: 'SYSTEM',
+    research: 'RESEARCH', bandit: 'BANDIT', deliverability: 'DELIVER'
   };
 
   const LEVEL_ICONS = { success: '✓', info: '·', warning: '!', error: '✕' };
@@ -2515,7 +2614,8 @@
       loadSettings(),
       loadInboxes(),
       loadDrafts(),
-      loadAssets()
+      loadAssets(),
+      loadResearch()
     ]);
 
     if (btn) btn.classList.remove('spinning');
@@ -2524,6 +2624,258 @@
 
   // Start SSE on page load
   initActivitySSE();
+
+  // ============================================================
+  // RESEARCH INTELLIGENCE
+  // ============================================================
+
+  async function loadResearch() {
+    try {
+      const [icpRes, repliesRes, synthesisRes, programRes, deliverRes, verticalsRes, banditRes] = await Promise.allSettled([
+        fetch('/api/research/icp').then(r => r.json()),
+        fetch('/api/research/replies').then(r => r.json()),
+        fetch('/api/research/synthesis').then(r => r.json()),
+        fetch('/api/research/program').then(r => r.json()),
+        fetch('/api/research/deliverability').then(r => r.json()),
+        fetch('/api/research/verticals').then(r => r.json()),
+        fetch('/api/research/bandit').then(r => r.json())
+      ]);
+
+      // ICP Cohorts
+      if (icpRes.status === 'fulfilled') renderICPCohorts(icpRes.value);
+
+      // Reply Analysis
+      if (repliesRes.status === 'fulfilled') renderReplyAnalysis(repliesRes.value);
+
+      // Winner Synthesis
+      if (synthesisRes.status === 'fulfilled') renderWinnerSynthesis(synthesisRes.value);
+
+      // Program
+      if (programRes.status === 'fulfilled') renderProgram(programRes.value);
+
+      // Deliverability
+      if (deliverRes.status === 'fulfilled') renderDeliverability(deliverRes.value);
+
+      // Verticals
+      if (verticalsRes.status === 'fulfilled') renderVerticals(verticalsRes.value);
+
+      // Bandit
+      if (banditRes.status === 'fulfilled') renderBandit(banditRes.value);
+
+    } catch (err) {
+      console.warn('Research load error', err);
+    }
+  }
+
+  function renderICPCohorts(data) {
+    const cohorts = data.cohorts || [];
+    const refined = data.refined_icp;
+
+    const el = document.getElementById('icp-cohorts');
+    document.getElementById('icp-badge').textContent = `${cohorts.length} cohorts`;
+
+    if (!cohorts.length) {
+      el.innerHTML = '<div class="empty-state" style="padding:12px 0;">Gathering cohort data from campaigns...</div>';
+    } else {
+      const maxRate = Math.max(...cohorts.map(c => c.reply_rate || 0), 0.01);
+      el.innerHTML = cohorts.slice(0, 8).map(c => {
+        const pct = ((c.reply_rate || 0) * 100).toFixed(2);
+        const barW = Math.round((c.reply_rate / maxRate) * 100);
+        const color = c.reply_rate > 0.05 ? 'var(--green)' : c.reply_rate > 0.02 ? 'var(--amber)' : 'var(--text-muted)';
+        return `<div style="margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+            <span style="font-size:11px;color:var(--text-secondary);">${c.title} · ${c.country} · ${c.company_size_bucket}</span>
+            <span style="font-family:var(--font-mono);font-size:11px;color:${color};">${pct}% <span style="color:var(--text-muted);font-size:10px;">(n=${c.emails_sent})</span></span>
+          </div>
+          <div style="height:3px;background:rgba(255,255,255,0.06);border-radius:2px;"><div style="height:3px;width:${barW}%;background:${color};border-radius:2px;transition:width 0.4s;"></div></div>
+        </div>`;
+      }).join('');
+    }
+
+    const refinedBox = document.getElementById('refined-icp-box');
+    if (refined) {
+      document.getElementById('refined-icp-text').textContent = refined.refined_icp_description || JSON.stringify(refined);
+      refinedBox.style.display = 'block';
+    }
+  }
+
+  function renderReplyAnalysis(data) {
+    const insights = data.insights || [];
+    const stepAttr = data.step_attribution;
+    const el = document.getElementById('reply-analysis-content');
+
+    if (!insights.length) {
+      el.innerHTML = '<div style="font-size:11px;color:var(--text-muted);">Analysing reply patterns — needs 5+ classified replies</div>';
+    } else {
+      const latest = insights[0];
+      const angles = (latest.winning_angles || []).slice(0, 3);
+      const objections = (latest.top_objections || []).slice(0, 2);
+      let html = '';
+      if (angles.length) {
+        html += `<div style="font-size:10px;letter-spacing:0.08em;color:var(--green);margin-bottom:4px;">WINNING ANGLES</div>`;
+        html += angles.map(a => `<div style="font-size:11px;color:var(--text-secondary);padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.04);">· ${a}</div>`).join('');
+      }
+      if (objections.length) {
+        html += `<div style="font-size:10px;letter-spacing:0.08em;color:var(--amber);margin-top:10px;margin-bottom:4px;">TOP OBJECTIONS</div>`;
+        html += objections.map(o => `<div style="font-size:11px;color:var(--text-secondary);padding:3px 0;">· ${o}</div>`).join('');
+      }
+      if (latest.claude_summary) {
+        html += `<div style="margin-top:10px;font-size:11px;color:var(--violet-bright);font-style:italic;padding:8px;background:rgba(124,92,252,0.06);border-radius:6px;">${latest.claude_summary}</div>`;
+      }
+      el.innerHTML = html || '<div style="font-size:11px;color:var(--text-muted);">Analysis stored — check back after more replies</div>';
+    }
+
+    // Step attribution bars
+    const barsEl = document.getElementById('step-attribution-bars');
+    if (stepAttr) {
+      const steps = ['step_1','step_2','step_3','step_4'];
+      const maxReplies = Math.max(...steps.map(s => stepAttr[s]?.positive_replies || 0), 1);
+      barsEl.innerHTML = steps.map((s, i) => {
+        const d = stepAttr[s] || {};
+        const w = Math.round(((d.positive_replies || 0) / maxReplies) * 100);
+        const isBest = s === stepAttr.best_step;
+        const color = isBest ? 'var(--crystal)' : 'var(--violet-dim)';
+        return `<div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);width:42px;">Email ${i+1}</span>
+          <div style="flex:1;height:4px;background:rgba(255,255,255,0.06);border-radius:2px;">
+            <div style="height:4px;width:${w}%;background:${color};border-radius:2px;"></div>
+          </div>
+          <span style="font-family:var(--font-mono);font-size:10px;color:${color};width:30px;text-align:right;">${d.positive_replies || 0}</span>
+        </div>`;
+      }).join('');
+    } else {
+      barsEl.innerHTML = '<div style="font-size:11px;color:var(--text-muted);">Awaiting step-attributed replies...</div>';
+    }
+  }
+
+  function renderWinnerSynthesis(syntheses) {
+    const el = document.getElementById('winner-synthesis-content');
+    if (!syntheses.length) {
+      el.innerHTML = '<div class="empty-state" style="padding:8px 0;">Awaiting 3+ winners for synthesis...</div>';
+      return;
+    }
+    const s = syntheses[0];
+    const elems = s.new_baseline_elements || {};
+    let html = '';
+    if (elems.meta_insight) {
+      html += `<div style="padding:10px 12px;background:rgba(100,220,150,0.06);border:1px solid rgba(100,220,150,0.15);border-radius:8px;margin-bottom:10px;">
+        <div style="font-size:10px;letter-spacing:0.08em;color:var(--green);margin-bottom:4px;">META-INSIGHT</div>
+        <div style="font-size:12px;color:var(--text-secondary);line-height:1.5;">${elems.meta_insight}</div>
+      </div>`;
+    }
+    if (elems.key_principles?.length) {
+      html += `<div style="font-size:10px;letter-spacing:0.08em;color:var(--crystal);margin-bottom:6px;">KEY PRINCIPLES</div>`;
+      html += (elems.key_principles || []).map(p => `<div style="font-size:11px;color:var(--text-secondary);padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.03);">· ${p}</div>`).join('');
+    }
+    if (s.winners_used?.length) {
+      html += `<div style="font-size:10px;color:var(--text-muted);margin-top:8px;">Based on ${s.winners_used.length} winners · ${new Date(s.synthesized_at).toLocaleDateString()}</div>`;
+    }
+    el.innerHTML = html;
+  }
+
+  function renderProgram(data) {
+    const el = document.getElementById('program-content');
+    el.textContent = data.current_program || 'Program not found';
+
+    const history = data.evolution_history || [];
+    const histEl = document.getElementById('evolution-history');
+    if (history.length) {
+      histEl.innerHTML = `<div style="font-size:10px;letter-spacing:0.08em;color:var(--text-muted);margin-bottom:6px;">${history.length} EVOLUTION${history.length !== 1 ? 'S' : ''}</div>` +
+        history.slice(0, 3).map(e => `<div style="font-size:11px;color:var(--text-muted);padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.03);">${new Date(e.evolved_at).toLocaleDateString()} · ${e.rationale?.slice(0, 80)}...</div>`).join('');
+    }
+    document.getElementById('program-evolution-badge').textContent = history.length ? `${history.length} evolutions` : 'self-evolving';
+  }
+
+  function renderDeliverability(logs) {
+    const el = document.getElementById('deliverability-content');
+    const anomalies = (logs || []).filter(l => l.anomaly_detected);
+    const badge = document.getElementById('deliverability-badge');
+
+    if (!logs?.length) {
+      el.innerHTML = '<div style="font-size:11px;color:var(--text-muted);">No deliverability data yet</div>';
+      badge.textContent = 'no data';
+      return;
+    }
+
+    badge.textContent = anomalies.length ? `${anomalies.length} alert${anomalies.length !== 1 ? 's' : ''}` : 'all clear';
+    badge.style.borderColor = anomalies.length ? 'rgba(255,170,0,0.4)' : '';
+    badge.style.color = anomalies.length ? 'var(--amber)' : '';
+
+    if (!anomalies.length) {
+      const latest = logs[0];
+      el.innerHTML = `<div style="font-size:11px;color:var(--green);">All campaigns within normal open rate range</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">${logs.length} campaign-days tracked · Latest: ${new Date(latest.date).toLocaleDateString()}</div>`;
+    } else {
+      el.innerHTML = anomalies.slice(0, 5).map(a => `
+        <div style="padding:8px 10px;background:rgba(255,170,0,0.05);border:1px solid rgba(255,170,0,0.15);border-radius:8px;margin-bottom:8px;">
+          <div style="font-size:11px;color:var(--amber);">${a.anomaly_type?.toUpperCase()}: ${a.campaign_name || a.campaign_id}</div>
+          <div style="font-family:var(--font-mono);font-size:11px;color:var(--text-secondary);margin-top:2px;">${(a.open_rate * 100).toFixed(1)}% today vs ${(a.seven_day_avg_open_rate * 100).toFixed(1)}% avg · ${a.date}</div>
+        </div>`).join('');
+    }
+  }
+
+  async function setVerticalStatus(id, status) {
+    await fetch(`/api/research/verticals/${id}`, {
+      method: 'PATCH',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ status })
+    });
+    await loadResearch();
+  }
+
+  function renderVerticals(verticals) {
+    const el = document.getElementById('verticals-content');
+    if (!verticals.length) {
+      el.innerHTML = '<div style="font-size:11px;color:var(--text-muted);">ORACLE will propose verticals after 15 experiments</div>';
+      return;
+    }
+
+    const STATUS_COLOR = { active: 'var(--green)', testing: 'var(--crystal)', proposed: 'var(--amber)', rejected: 'var(--text-muted)' };
+    el.innerHTML = verticals.map(v => `
+      <div style="padding:10px 12px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:8px;margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div style="font-family:var(--font-display);font-size:12px;color:var(--crystal);">${v.name.replace(/_/g,' ').toUpperCase()}</div>
+          <span style="font-family:var(--font-mono);font-size:10px;color:${STATUS_COLOR[v.status] || 'var(--text-muted)'};">${v.status}</span>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:3px;">${v.icp_description || v.description || ''}</div>
+        ${v.proposed_rationale ? `<div style="font-size:10px;color:var(--text-muted);margin-top:4px;font-style:italic;">${v.proposed_rationale.slice(0,100)}...</div>` : ''}
+        ${v.status === 'proposed' ? `<div style="margin-top:8px;display:flex;gap:8px;">
+          <button onclick="setVerticalStatus('${v.id}','testing')" style="font-size:10px;padding:3px 10px;background:rgba(124,92,252,0.15);border:1px solid rgba(124,92,252,0.3);color:var(--violet-bright);border-radius:5px;cursor:pointer;">Start Testing</button>
+          <button onclick="setVerticalStatus('${v.id}','rejected')" style="font-size:10px;padding:3px 10px;background:rgba(255,68,102,0.08);border:1px solid rgba(255,68,102,0.2);color:var(--red);border-radius:5px;cursor:pointer;">Reject</button>
+        </div>` : ''}
+      </div>`).join('');
+  }
+
+  function renderBandit(states) {
+    const el = document.getElementById('bandit-content');
+    if (!states.length) {
+      el.innerHTML = '<div style="font-size:11px;color:var(--text-muted);">Thompson sampling activates after first experiment is scored</div>';
+      return;
+    }
+
+    const maxTrials = Math.max(...states.map(s => s.total_trials), 1);
+    el.innerHTML = `
+      <div style="font-size:10px;letter-spacing:0.08em;color:var(--text-muted);margin-bottom:10px;display:grid;grid-template-columns:1fr auto auto auto;gap:8px;">
+        <span>VARIANT</span><span>α (wins)</span><span>β (losses)</span><span>TRIALS</span>
+      </div>` +
+      states.slice(0, 8).map(s => {
+        const winRate = s.alpha / (s.alpha + s.beta);
+        const color = winRate > 0.6 ? 'var(--green)' : winRate > 0.4 ? 'var(--text-secondary)' : 'var(--text-muted)';
+        return `<div style="display:grid;grid-template-columns:1fr auto auto auto;gap:8px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.04);font-size:11px;">
+          <span style="color:${color};font-family:var(--font-mono);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${s.variant_id}</span>
+          <span style="font-family:var(--font-mono);font-size:11px;color:var(--green);">${parseFloat(s.alpha).toFixed(1)}</span>
+          <span style="font-family:var(--font-mono);font-size:11px;color:var(--red);">${parseFloat(s.beta).toFixed(1)}</span>
+          <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);">${s.total_trials}</span>
+        </div>`;
+      }).join('');
+  }
+
+  // Auto-refresh research every 5 minutes (300s)
+  setInterval(loadResearch, 300000);
+
+  // Initial load
+  loadResearch();
+
 </script>
 </body>
 </html>

@@ -13,6 +13,9 @@ import { getSetting, setSetting } from '../utils/settings.js';
 import { logActivity } from '../utils/activity.js';
 import { launchApprovedCampaign } from '../pipeline/launch_approved.js';
 import { invalidateAssetsCache } from '../utils/assets.js';
+import { classifyReply } from '../loop/reply_analyzer.js';
+import { getVerticals, updateVerticalStatus } from '../loop/vertical_researcher.js';
+import { getBanditState } from '../loop/multi_armed_bandit.js';
 import logger from '../utils/logger.js';
 import 'dotenv/config';
 
@@ -236,12 +239,11 @@ app.post('/webhook/reply', async (req, res) => {
 
     const companyName = leadData?.company_name || 'Unknown Company';
 
-    const draft = await draftReply({
-      lead_name: leadName,
-      company_name: companyName,
-      reply_body: replyBody,
-      email_step: emailStep
-    });
+    // Classify reply intent in parallel with draft generation
+    const [draft, replyClass] = await Promise.all([
+      draftReply({ lead_name: leadName, company_name: companyName, reply_body: replyBody, email_step: emailStep }),
+      classifyReply(replyBody)
+    ]);
 
     const { data: logRow } = await supabase
       .from('reply_log')
@@ -254,6 +256,8 @@ app.post('/webhook/reply', async (req, res) => {
         inbound_message: replyBody,
         oracle_draft: draft,
         action: 'pending',
+        reply_intent: replyClass?.intent || null,
+        reply_sentiment: replyClass?.sentiment || null,
         ...(emailStep ? { email_step: emailStep } : {})
       })
       .select()
@@ -573,6 +577,99 @@ app.delete('/api/campaigns/:id', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// ---- Research Intelligence API ----
+
+app.get('/api/research/icp', async (req, res) => {
+  try {
+    const { data } = await supabase
+      .from('cohort_insights')
+      .select('*')
+      .gte('emails_sent', 3)
+      .order('reply_rate', { ascending: false })
+      .limit(20);
+    const refined = await getSetting('refined_icp', null);
+    res.json({ cohorts: data || [], refined_icp: refined ? JSON.parse(refined) : null });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/research/replies', async (req, res) => {
+  try {
+    const { data } = await supabase
+      .from('reply_insights')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(5);
+    const stepAttr = await getSetting('step_attribution', null);
+    res.json({
+      insights: data || [],
+      step_attribution: stepAttr ? JSON.parse(stepAttr) : null
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/research/synthesis', async (req, res) => {
+  try {
+    const { data } = await supabase
+      .from('winner_synthesis')
+      .select('*')
+      .order('synthesized_at', { ascending: false })
+      .limit(3);
+    res.json(data || []);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/research/program', async (req, res) => {
+  try {
+    const { data } = await supabase
+      .from('program_evolution')
+      .select('evolved_at, rationale, key_changes, performance_context')
+      .order('evolved_at', { ascending: false })
+      .limit(5);
+    const { readFile } = await import('fs/promises');
+    const { fileURLToPath } = await import('url');
+    const { dirname: dn, join: pjoin } = await import('path');
+    const dir = dn(fileURLToPath(import.meta.url));
+    let current = '';
+    try { current = await readFile(pjoin(dir, '../program.md'), 'utf8'); } catch {}
+    res.json({ current_program: current, evolution_history: data || [] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/research/deliverability', async (req, res) => {
+  try {
+    const { data } = await supabase
+      .from('deliverability_log')
+      .select('*')
+      .order('date', { ascending: false })
+      .limit(30);
+    res.json(data || []);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/research/verticals', async (req, res) => {
+  try {
+    res.json(await getVerticals());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.patch('/api/research/verticals/:id', async (req, res) => {
+  try {
+    const { status } = req.body;
+    if (!['proposed', 'testing', 'active', 'rejected'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+    await updateVerticalStatus(req.params.id, status);
+    await logActivity({ category: 'research', level: 'info', message: `Vertical ${req.params.id} status → ${status}` });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/research/bandit', async (req, res) => {
+  try {
+    res.json(await getBanditState());
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 export function startDashboard() {
