@@ -1999,78 +1999,7 @@
     } catch (e) { console.error('Remove domain failed', e); }
   };
 
-  // ---- Soft update: only repaint a section if its data actually changed ----
-  const _dataCache = {};
-  function _changed(key, data) {
-    const s = JSON.stringify(data);
-    if (_dataCache[key] === s) return false;
-    _dataCache[key] = s;
-    return true;
-  }
 
-  // Wrap the heavy innerHTML sections with cache guards so they only repaint on change
-  const _origLoadHealth = loadHealth;
-  loadHealth = async function() {
-    const r = await fetch('/api/health').catch(() => null);
-    if (!r) return;
-    const d = await r.json();
-    if (!_changed('health', d)) return;
-    await _origLoadHealth();
-  };
-
-  const _origLoadCampaigns = loadCampaigns;
-  loadCampaigns = async function() {
-    const r = await fetch('/api/campaigns').catch(() => null);
-    if (!r) return;
-    const d = await r.json();
-    if (!_changed('campaigns', d)) return;
-    await _origLoadCampaigns();
-  };
-
-  const _origLoadExperiments = loadExperiments;
-  loadExperiments = async function() {
-    const r = await fetch('/api/experiments').catch(() => null);
-    if (!r) return;
-    const d = await r.json();
-    if (!_changed('experiments', d)) return;
-    await _origLoadExperiments();
-  };
-
-  const _origLoadSkipList = loadSkipList;
-  loadSkipList = async function() {
-    const r = await fetch('/api/skip-list').catch(() => null);
-    if (!r) return;
-    const d = await r.json();
-    if (!_changed('skiplist', d)) return;
-    await _origLoadSkipList();
-  };
-
-  const _origLoadSequence = loadSequence;
-  loadSequence = async function() {
-    const r = await fetch('/api/copy').catch(() => null);
-    if (!r) return;
-    const d = await r.json();
-    if (!_changed('sequence', d)) return;
-    await _origLoadSequence();
-  };
-
-  const _origLoadAssets = loadAssets;
-  loadAssets = async function() {
-    const r = await fetch('/api/assets').catch(() => null);
-    if (!r) return;
-    const d = await r.json();
-    if (!_changed('assets', d)) return;
-    await _origLoadAssets();
-  };
-
-  const _origLoadInboxes = loadInboxes;
-  loadInboxes = async function() {
-    const r = await fetch('/api/inboxes').catch(() => null);
-    if (!r) return;
-    const d = await r.json();
-    if (!_changed('inboxes', d)) return;
-    await _origLoadInboxes();
-  };
 
   // ---- Initial load ----
   refreshAll();
@@ -2533,7 +2462,6 @@
   // ---- Full manual refresh (used by the refresh button only) ----
   // Bypasses cache so user gets fresh data on demand
   refreshAll = async function() {
-    Object.keys(_dataCache).forEach(k => delete _dataCache[k]); // clear cache
     const btn = document.getElementById('refresh-btn');
     if (btn) btn.classList.add('spinning');
     document.getElementById('last-refresh-time').textContent = 'Refreshing...';
