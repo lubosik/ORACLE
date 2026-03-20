@@ -1303,31 +1303,6 @@
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:20px;">
 
-      <!-- Oracle Toggle (Supabase-backed) -->
-      <div class="card" style="padding:24px;">
-        <div class="card-title" style="margin-bottom:16px;">Global Switch</div>
-        <div id="oracle-supabase-toggle" onclick="toggleOracleSupabase()" style="
-          display:inline-flex;align-items:center;gap:10px;
-          background:rgba(255,68,102,0.08);border:1px solid rgba(255,68,102,0.35);
-          border-radius:28px;padding:7px 16px 7px 10px;cursor:pointer;
-          transition:all 0.35s ease;user-select:none;
-        ">
-          <div id="oracle-supa-track" style="
-            width:36px;height:20px;border-radius:10px;
-            background:rgba(255,68,102,0.35);position:relative;transition:background 0.35s;flex-shrink:0;
-          ">
-            <div id="oracle-supa-thumb" style="
-              width:14px;height:14px;border-radius:50%;background:var(--red);
-              position:absolute;top:3px;left:3px;
-              transition:transform 0.3s,background 0.35s;
-              box-shadow:0 0 6px rgba(255,68,102,0.6);
-            "></div>
-          </div>
-          <span id="oracle-supa-label" style="font-size:11px;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:var(--red);font-family:var(--font-display);white-space:nowrap;">ORACLE OFF</span>
-        </div>
-        <div style="margin-top:10px;font-size:11px;color:var(--text-muted);">Toggle updates Supabase system_settings in real time.</div>
-      </div>
-
       <!-- Campaign Size Limits -->
       <div class="card" style="padding:24px;">
         <div class="card-title" style="margin-bottom:16px;">Campaign Size Limits</div>
@@ -2011,9 +1986,9 @@
 
   async function loadEngineState() {
     try {
-      const r = await fetch('/api/engine/state');
-      const data = await r.json();
-      applyEngineUI(data.enabled === true);
+      const r = await fetch('/api/settings');
+      const s = await r.json();
+      applyEngineUI(s.oracle_enabled === 'true');
     } catch { applyEngineUI(false); }
   }
 
@@ -2021,13 +1996,13 @@
     const wrap = document.getElementById('engine-toggle-wrap');
     wrap.style.pointerEvents = 'none';
     try {
-      const r = await fetch('/api/engine/state', {
+      const r = await fetch('/api/oracle/toggle', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled: !_engineEnabled })
       });
-      const data = await r.json();
-      applyEngineUI(data.enabled === true);
+      const d = await r.json();
+      applyEngineUI(d.oracle_enabled === true);
     } catch (e) { console.error('Toggle failed', e); }
     wrap.style.pointerEvents = '';
   }
@@ -2325,46 +2300,6 @@
   // ============================================================
   // CONTROLS
   // ============================================================
-  let _oracleSupabaseEnabled = false;
-
-  function applyOracleSupabaseUI(enabled) {
-    _oracleSupabaseEnabled = enabled;
-    const wrap = document.getElementById('oracle-supabase-toggle');
-    const track = document.getElementById('oracle-supa-track');
-    const thumb = document.getElementById('oracle-supa-thumb');
-    const label = document.getElementById('oracle-supa-label');
-    if (enabled) {
-      wrap.style.background = 'rgba(0,232,150,0.08)';
-      wrap.style.borderColor = 'rgba(0,232,150,0.35)';
-      track.style.background = 'rgba(0,232,150,0.5)';
-      thumb.style.transform = 'translateX(16px)';
-      thumb.style.background = 'var(--green)';
-      thumb.style.boxShadow = '0 0 6px rgba(0,232,150,0.7)';
-      label.textContent = 'ORACLE ON';
-      label.style.color = 'var(--green)';
-    } else {
-      wrap.style.background = 'rgba(255,68,102,0.08)';
-      wrap.style.borderColor = 'rgba(255,68,102,0.35)';
-      track.style.background = 'rgba(255,68,102,0.35)';
-      thumb.style.transform = '';
-      thumb.style.background = 'var(--red)';
-      thumb.style.boxShadow = '0 0 6px rgba(255,68,102,0.6)';
-      label.textContent = 'ORACLE OFF';
-      label.style.color = 'var(--red)';
-    }
-  }
-
-  async function toggleOracleSupabase() {
-    try {
-      const r = await fetch('/api/oracle/toggle', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled: !_oracleSupabaseEnabled })
-      });
-      const d = await r.json();
-      applyOracleSupabaseUI(d.oracle_enabled === true);
-    } catch(e) { console.error('Oracle toggle failed', e); }
-  }
 
   // Day toggle interactivity
   document.querySelectorAll('.day-toggle').forEach(el => {
@@ -2380,7 +2315,6 @@
       document.getElementById('ctrl-max-leads').value = s.max_leads_per_campaign || 200;
       document.getElementById('ctrl-require-warm').checked = s.require_warm_inboxes_only !== 'false';
       document.getElementById('ctrl-inboxes-count').value = s.inboxes_per_campaign || 3;
-      applyOracleSupabaseUI(s.oracle_enabled === 'true');
       // Schedule
       if (s.send_time_from) document.getElementById('ctrl-time-from').value = s.send_time_from;
       if (s.send_time_to)   document.getElementById('ctrl-time-to').value   = s.send_time_to;
