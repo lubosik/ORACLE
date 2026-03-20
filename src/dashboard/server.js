@@ -420,20 +420,14 @@ app.get('/api/activity', async (req, res) => {
 // ---- NEW: System settings ----
 app.get('/api/settings', async (req, res) => {
   try {
-    // Order by updated_at DESC so that for any duplicate keys (legacy inserts),
-    // the newest value wins when we deduplicate via Object.fromEntries.
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('system_settings')
-      .select('*')
-      .order('updated_at', { ascending: false });
-    // First occurrence per key = most recently updated
-    const seen = new Set();
-    const deduped = (data || []).filter(r => {
-      if (seen.has(r.key)) return false;
-      seen.add(r.key);
-      return true;
-    });
-    res.json(Object.fromEntries(deduped.map(r => [r.key, r.value])));
+      .select('key, value');
+    if (error) throw error;
+    // Last-write-wins deduplication (handles any legacy duplicate rows)
+    const map = {};
+    for (const r of (data || [])) map[r.key] = r.value;
+    res.json(map);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

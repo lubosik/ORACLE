@@ -2329,6 +2329,27 @@
     } catch(e) { console.error('Load settings failed', e); }
   }
 
+  async function postSetting(key, value) {
+    const r = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, value })
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      throw new Error(d.error || `HTTP ${r.status}`);
+    }
+  }
+
+  function showConfirm(elId, msg, isError) {
+    const c = document.getElementById(elId);
+    if (!c) return;
+    c.textContent = msg;
+    c.style.color = isError ? 'var(--red)' : 'var(--green)';
+    c.style.display = 'block';
+    setTimeout(() => c.style.display = 'none', isError ? 6000 : 3000);
+  }
+
   async function saveSchedule() {
     const timeFrom   = document.getElementById('ctrl-time-from').value;
     const timeTo     = document.getElementById('ctrl-time-to').value;
@@ -2337,30 +2358,30 @@
     const days       = [...document.querySelectorAll('.day-toggle.active')].map(el => el.dataset.day).join(',');
     try {
       await Promise.all([
-        fetch('/api/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ key:'send_time_from',   value: timeFrom }) }),
-        fetch('/api/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ key:'send_time_to',     value: timeTo }) }),
-        fetch('/api/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ key:'send_timezone',    value: timezone }) }),
-        fetch('/api/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ key:'send_daily_limit', value: dailyLimit }) }),
-        fetch('/api/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ key:'send_days',        value: days }) })
+        postSetting('send_time_from',   timeFrom),
+        postSetting('send_time_to',     timeTo),
+        postSetting('send_timezone',    timezone),
+        postSetting('send_daily_limit', dailyLimit),
+        postSetting('send_days',        days)
       ]);
-      const c = document.getElementById('ctrl-schedule-confirm');
-      c.textContent = 'Schedule saved. All future campaigns will use these settings.';
-      c.style.display = 'block';
-      setTimeout(() => c.style.display = 'none', 3000);
-    } catch(e) { console.error('Save schedule failed', e); }
+      showConfirm('ctrl-schedule-confirm', 'Schedule saved. All future campaigns will use these settings.', false);
+    } catch(e) {
+      showConfirm('ctrl-schedule-confirm', 'Save failed: ' + e.message, true);
+    }
   }
 
   async function saveLeadLimits() {
     const min = document.getElementById('ctrl-min-leads').value;
     const max = document.getElementById('ctrl-max-leads').value;
     try {
-      await fetch('/api/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ key: 'min_leads_per_campaign', value: min }) });
-      await fetch('/api/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ key: 'max_leads_per_campaign', value: max }) });
-      const c = document.getElementById('ctrl-limits-confirm');
-      c.textContent = 'Saved.';
-      c.style.display = 'block';
-      setTimeout(() => c.style.display = 'none', 3000);
-    } catch(e) { console.error('Save limits failed', e); }
+      await Promise.all([
+        postSetting('min_leads_per_campaign', min),
+        postSetting('max_leads_per_campaign', max)
+      ]);
+      showConfirm('ctrl-limits-confirm', 'Saved.', false);
+    } catch(e) {
+      showConfirm('ctrl-limits-confirm', 'Save failed: ' + e.message, true);
+    }
   }
 
   // ---- Geo targeting ----
@@ -2416,13 +2437,14 @@
     const warm = document.getElementById('ctrl-require-warm').checked;
     const count = document.getElementById('ctrl-inboxes-count').value;
     try {
-      await fetch('/api/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ key: 'require_warm_inboxes_only', value: warm ? 'true' : 'false' }) });
-      await fetch('/api/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ key: 'inboxes_per_campaign', value: count }) });
-      const c = document.getElementById('ctrl-inbox-confirm');
-      c.textContent = 'Saved.';
-      c.style.display = 'block';
-      setTimeout(() => c.style.display = 'none', 3000);
-    } catch(e) { console.error('Save inbox settings failed', e); }
+      await Promise.all([
+        postSetting('require_warm_inboxes_only', warm ? 'true' : 'false'),
+        postSetting('inboxes_per_campaign', count)
+      ]);
+      showConfirm('ctrl-inbox-confirm', 'Saved.', false);
+    } catch(e) {
+      showConfirm('ctrl-inbox-confirm', 'Save failed: ' + e.message, true);
+    }
   }
 
   async function loadInboxes() {
