@@ -14,6 +14,7 @@ import { logActivity } from '../utils/activity.js';
 import { launchApprovedCampaign } from '../pipeline/launch_approved.js';
 import { invalidateAssetsCache } from '../utils/assets.js';
 import { classifyReply } from '../loop/reply_analyzer.js';
+import { GEO_GROUPS, GEO_ROTATION } from '../pipeline/geo_targeting.js';
 import { getVerticals, updateVerticalStatus } from '../loop/vertical_researcher.js';
 import { getBanditState } from '../loop/multi_armed_bandit.js';
 import logger from '../utils/logger.js';
@@ -577,6 +578,38 @@ app.delete('/api/campaigns/:id', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// ---- Geo targeting ----
+app.get('/api/geo', async (req, res) => {
+  try {
+    const current = await getSetting('active_geo_group', 'uk');
+    res.json({
+      active: current,
+      groups: GEO_ROTATION.map(id => ({
+        id,
+        label: GEO_GROUPS[id].label,
+        timezone: GEO_GROUPS[id].timezone,
+        country: GEO_GROUPS[id].country,
+        target_count: GEO_GROUPS[id].targets.length,
+        targets: GEO_GROUPS[id].targets.map(t => t.city || t.state)
+      }))
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/geo', async (req, res) => {
+  try {
+    const { group_id } = req.body;
+    if (!GEO_GROUPS[group_id]) return res.status(400).json({ error: 'Unknown geo group' });
+    await setSetting('active_geo_group', group_id);
+    await logActivity({
+      category: 'system',
+      level: 'info',
+      message: `Geo group set to: ${GEO_GROUPS[group_id].label} (${GEO_GROUPS[group_id].timezone})`
+    });
+    res.json({ ok: true, active: group_id });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ---- Research Intelligence API ----

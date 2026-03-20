@@ -1387,6 +1387,15 @@
         </div>
       </div>
 
+      <!-- Geo Targeting -->
+      <div class="card" style="padding:24px;">
+        <div class="card-title" style="margin-bottom:4px;">Geo Targeting</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:16px;">Next pipeline run will target this market. Auto-rotates after each campaign. Each market uses its own timezone.</div>
+        <div id="geo-group-buttons" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;"></div>
+        <div id="geo-targets-preview" style="font-size:11px;color:var(--text-muted);font-family:var(--font-mono);line-height:1.8;padding:10px 12px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:8px;"></div>
+        <div id="ctrl-geo-confirm" style="display:none;font-size:11px;color:var(--green);font-family:var(--font-mono);margin-top:8px;"></div>
+      </div>
+
       <!-- Sending Schedule -->
       <div class="card" style="padding:24px;">
         <div class="card-title" style="margin-bottom:4px;">Sending Schedule</div>
@@ -2349,6 +2358,7 @@
 
   async function loadSettings() {
     try {
+      loadGeo(); // non-blocking — geo has its own endpoint
       const r = await fetch('/api/settings');
       const s = await r.json();
       document.getElementById('ctrl-min-leads').value = s.min_leads_per_campaign || 50;
@@ -2402,6 +2412,55 @@
       c.style.display = 'block';
       setTimeout(() => c.style.display = 'none', 3000);
     } catch(e) { console.error('Save limits failed', e); }
+  }
+
+  // ---- Geo targeting ----
+  let _geoData = null;
+
+  async function loadGeo() {
+    try {
+      const r = await fetch('/api/geo');
+      _geoData = await r.json();
+      renderGeoButtons();
+    } catch(e) { console.warn('Geo load failed', e); }
+  }
+
+  function renderGeoButtons() {
+    if (!_geoData) return;
+    const wrap = document.getElementById('geo-group-buttons');
+    const preview = document.getElementById('geo-targets-preview');
+    if (!wrap) return;
+
+    const active = _geoData.active;
+    wrap.innerHTML = _geoData.groups.map(g => `
+      <button onclick="setGeoGroup('${g.id}')" style="
+        padding:7px 14px;border-radius:8px;font-size:11px;cursor:pointer;font-family:var(--font-body);
+        font-weight:500;transition:all 0.2s;letter-spacing:0.04em;
+        background:${g.id === active ? 'rgba(124,92,252,0.2)' : 'rgba(255,255,255,0.04)'};
+        border:1px solid ${g.id === active ? 'rgba(124,92,252,0.5)' : 'rgba(255,255,255,0.1)'};
+        color:${g.id === active ? 'var(--violet-bright)' : 'var(--text-muted)'};
+      ">${g.label} ${g.id === active ? '✓' : ''}</button>`).join('');
+
+    const activeGroup = _geoData.groups.find(g => g.id === active);
+    if (activeGroup && preview) {
+      preview.innerHTML = `<span style="color:var(--crystal);">${activeGroup.label}</span>  ·  ${activeGroup.timezone}<br>` +
+        `<span style="color:var(--text-muted);">Targets (in order): </span>${activeGroup.targets.join(', ')}`;
+    }
+  }
+
+  async function setGeoGroup(groupId) {
+    try {
+      await fetch('/api/geo', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ group_id: groupId })
+      });
+      await loadGeo();
+      const c = document.getElementById('ctrl-geo-confirm');
+      c.textContent = `Geo set to ${_geoData?.groups.find(g => g.id === groupId)?.label}. Next pipeline run will target this market.`;
+      c.style.display = 'block';
+      setTimeout(() => c.style.display = 'none', 4000);
+    } catch(e) { console.error('Set geo failed', e); }
   }
 
   async function saveInboxSettings() {

@@ -9,7 +9,8 @@ export async function createCampaignDraft({
   sequence,
   selectedInboxes,
   minLeads,
-  maxLeads
+  maxLeads,
+  geoContext = null
 }) {
   if (leads.length < minLeads) {
     await logActivity({
@@ -55,6 +56,7 @@ export async function createCampaignDraft({
       selected_inboxes: selectedInboxes,
       min_leads: minLeads,
       max_leads: maxLeads,
+      geo_context: geoContext || null,
       status: 'pending'
     })
     .select()

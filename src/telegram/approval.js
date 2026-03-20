@@ -13,19 +13,32 @@ export async function sendCampaignApprovalRequest(bot, chatId, draft) {
   const schedule = await getSchedule();
   const activeDays = schedule.days.map(d => DAY_NAMES[d] || d).join(', ');
 
+  const geoContext = draft.geo_context
+    ? (typeof draft.geo_context === 'string' ? JSON.parse(draft.geo_context) : draft.geo_context)
+    : null;
+
+  // Geo overrides the global schedule timezone for this campaign
+  const tz = geoContext?.timezone || schedule.timezone;
+  const timeFrom = geoContext?.send_hours?.from || schedule.timeFrom;
+  const timeTo   = geoContext?.send_hours?.to   || schedule.timeTo;
+
   const truncate = (str, n) => (str || '').length > n ? (str || '').slice(0, n) + '...' : (str || '');
+
+  const geoLine = geoContext
+    ? `\nGeo Target: ${geoContext.geo_label} (${geoContext.country})\nMarkets: ${geoContext.targets_used.map(t => t.city || t.state).join(', ')}`
+    : '';
 
   const message = `ORACLE — CAMPAIGN READY FOR APPROVAL
 
 Campaign: ${draft.campaign_name}
 Leads: ${draft.lead_count}
-Variant: ${draft.variant_id || 'v1_baseline'}
+Variant: ${draft.variant_id || 'v1_baseline'}${geoLine}
 
 INBOXES SELECTED:
   ${inboxList}
 
 SENDING SCHEDULE:
-  ${schedule.timeFrom} — ${schedule.timeTo} ${schedule.timezone}
+  ${timeFrom} — ${timeTo} ${tz}
   Days: ${activeDays}
   Daily limit: ${schedule.dailyLimit} emails/day
 

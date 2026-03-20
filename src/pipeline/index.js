@@ -6,8 +6,9 @@ import { generateCopyBatch } from './copywriter.js';
 import { selectInboxes } from './inbox_selector.js';
 import { createCampaignDraft } from './draft_manager.js';
 import { sendCampaignApprovalRequest } from '../telegram/approval.js';
+import { getGeoGroup, nextGeoGroup, buildGeoLabel } from './geo_targeting.js';
 import { supabase } from '../utils/supabase.js';
-import { getSetting } from '../utils/settings.js';
+import { getSetting, setSetting } from '../utils/settings.js';
 import { logActivity } from '../utils/activity.js';
 import { sendTelegram, getBot } from '../telegram/bot.js';
 import logger from '../utils/logger.js';
@@ -62,15 +63,71 @@ export async function runPipeline(variantId = 'v1_baseline') {
       detail: { variant_id: variantId }
     });
 
-    // 1. Scrape
-    const { leads: rawLeads, noEmailSkipped } = await scrapeLeads();
-    stats.scraped_count = rawLeads.length;
-    stats.no_email_skipped = noEmailSkipped;
+    // 1. Load geo targeting config
+    const minLeads = parseInt(await getSetting('min_leads_per_campaign', '50'));
+    const activeGeoGroupId = await getSetting('active_geo_group', 'uk');
+    const geoGroup = getGeoGroup(activeGeoGroupId);
+    const MAX_GEO_TARGETS = 5; // max cities/states to try per run
 
     await logActivity({
       category: 'scraping',
       level: 'info',
-      message: `Apify scrape complete — ${rawLeads.length} leads returned, ${noEmailSkipped} had no email, skipped`,
+      message: `Geo targeting: ${geoGroup.label} (${geoGroup.timezone}) — will expand up to ${MAX_GEO_TARGETS} ${geoGroup.targets[0]?.city !== undefined ? 'cities' : 'states'} if needed`,
+      pipeline_run_id: runId,
+      detail: { geo_group: activeGeoGroupId, timezone: geoGroup.timezone }
+    });
+
+    // 2. Scrape geo targets one at a time, accumulating until min_leads reached
+    let allRawLeads = [];
+    let noEmailSkipped = 0;
+    const geoTargetsUsed = [];
+
+    for (let i = 0; i < Math.min(MAX_GEO_TARGETS, geoGroup.targets.length); i++) {
+      const target = { ...geoGroup.targets[i], country: geoGroup.country };
+      geoTargetsUsed.push(target);
+
+      const { leads: batch, noEmailSkipped: batchSkipped } = await scrapeLeads('real_estate', target);
+      allRawLeads.push(...batch);
+      noEmailSkipped += batchSkipped;
+
+      const geoName = target.city || target.state;
+      await logActivity({
+        category: 'scraping',
+        level: 'info',
+        message: `Scraped ${batch.length} leads from ${geoName} — running total: ${allRawLeads.length}`,
+        pipeline_run_id: runId
+      });
+
+      // Check if we have enough leads (rough check before dedup — dedup will reduce further)
+      if (allRawLeads.length >= minLeads * 1.5) break;
+    }
+
+    // Deduplicate across all batches by email
+    const emailSeen = new Set();
+    const rawLeads = allRawLeads.filter(l => {
+      if (!l.email || emailSeen.has(l.email)) return false;
+      emailSeen.add(l.email);
+      return true;
+    });
+
+    stats.scraped_count = rawLeads.length;
+    stats.no_email_skipped = noEmailSkipped;
+
+    const geoLabel = buildGeoLabel(geoGroup, geoTargetsUsed);
+    const geoContext = {
+      group_id: activeGeoGroupId,
+      label: geoGroup.label,
+      geo_label: geoLabel,
+      timezone: geoGroup.timezone,
+      country: geoGroup.country,
+      targets_used: geoTargetsUsed,
+      send_hours: geoGroup.send_hours
+    };
+
+    await logActivity({
+      category: 'scraping',
+      level: 'info',
+      message: `Geo scrape complete — ${rawLeads.length} unique leads from ${geoLabel} (${geoTargetsUsed.length} ${geoTargetsUsed[0]?.city ? 'cities' : 'states'})`,
       pipeline_run_id: runId
     });
 
@@ -78,7 +135,7 @@ export async function runPipeline(variantId = 'v1_baseline') {
       await upsertSeenLead(lead);
     }
 
-    // 2. Dedup
+    // 3. Dedup against campaign history
     const { passed: newLeads, skipped } = await filterNewLeads(rawLeads);
     stats.dedupe_skipped = skipped;
 
@@ -132,23 +189,24 @@ export async function runPipeline(variantId = 'v1_baseline') {
       pipeline_run_id: runId
     });
 
-    // 8. Read min/max lead settings
-    const minLeads = parseInt(await getSetting('min_leads_per_campaign', '50'));
+    // 8. Read max lead settings (min already loaded above for geo loop)
     const maxLeads = parseInt(await getSetting('max_leads_per_campaign', '200'));
 
-    // 9. Create campaign draft (draft-first, no immediate launch)
+    // 9. Create campaign draft with geo context
     const dateStr = new Date().toISOString().split('T')[0];
-    const campaignName = `ORACLE_AIRO_RE_${variantId}_${dateStr}`;
+    const geoSlug = (geoContext.geo_label || geoContext.label).replace(/[^a-zA-Z0-9]/g, '_').slice(0, 20);
+    const campaignName = `ORACLE_AIRO_${geoSlug}_${variantId}_${dateStr}`;
 
     const draft = await createCampaignDraft({
       pipelineRunId: runId,
       campaignName,
       variantId,
       leads: leadsWithCopy,
-      sequence: null, // copy is on each lead object
+      sequence: null,
       selectedInboxes,
       minLeads,
-      maxLeads
+      maxLeads,
+      geoContext
     });
 
     const durationMs = Date.now() - startTime;
@@ -191,15 +249,19 @@ export async function runPipeline(variantId = 'v1_baseline') {
       })
       .eq('id', runId);
 
+    // Rotate geo group so next pipeline run targets a different market
+    const nextGeo = nextGeoGroup(activeGeoGroupId);
+    await setSetting('active_geo_group', nextGeo);
+
     await logActivity({
       category: 'pipeline',
       level: 'success',
-      message: `Pipeline complete — campaign pending approval`,
+      message: `Pipeline complete — campaign pending approval (geo: ${geoContext.geo_label}, next run: ${nextGeo})`,
       pipeline_run_id: runId,
-      detail: { draft_id: draft.id }
+      detail: { draft_id: draft.id, geo_context: geoContext, next_geo: nextGeo }
     });
 
-    logger.info('Pipeline complete — campaign draft pending approval', { ...stats, draft_id: draft.id });
+    logger.info('Pipeline complete — campaign draft pending approval', { ...stats, draft_id: draft.id, geo: geoContext.geo_label });
 
   } catch (err) {
     logger.error('Pipeline fatal error', { error: err.message, stack: err.stack });

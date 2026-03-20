@@ -45,16 +45,25 @@ export async function launchApprovedCampaign(draft) {
     // 1. Load schedule from settings (Supabase-backed, adjustable from dashboard)
     const schedule = await getSchedule();
 
+    // Use geo-specific timezone if available — overrides the global setting
+    const geoContext = draft.geo_context
+      ? (typeof draft.geo_context === 'string' ? JSON.parse(draft.geo_context) : draft.geo_context)
+      : null;
+
+    const campaignTimezone = geoContext?.timezone || schedule.timezone;
+    const campaignTimeFrom = geoContext?.send_hours?.from || schedule.timeFrom;
+    const campaignTimeTo   = geoContext?.send_hours?.to   || schedule.timeTo;
+
     // 2. Create campaign in Instantly
     const campaign = await instantlyRequest('/campaigns', 'POST', {
       name: draft.campaign_name,
       email_list: inboxes,
       campaign_schedule: {
         schedules: [{
-          name: 'ORACLE Schedule',
-          timing: { from: schedule.timeFrom, to: schedule.timeTo },
+          name: `ORACLE — ${geoContext?.label || 'Campaign'}`,
+          timing: { from: campaignTimeFrom, to: campaignTimeTo },
           days: schedule.daysObj,
-          timezone: schedule.timezone
+          timezone: campaignTimezone
         }]
       },
       sequences: [{
@@ -116,7 +125,8 @@ export async function launchApprovedCampaign(draft) {
     // 6. Send confirmation to Telegram
     try {
       const { sendTelegram } = await import('../telegram/bot.js');
-      await sendTelegram(`ORACLE — CAMPAIGN LIVE\n\nName: ${draft.campaign_name}\nLeads: ${totalAdded}\nInboxes: ${inboxes.join(', ')}\nInstantly ID: ${campaign.id}\n\nYou can pause or manage this campaign from the ORACLE dashboard.`);
+      const geoLine = geoContext ? `\nGeo: ${geoContext.geo_label} (${geoContext.timezone})` : '';
+      await sendTelegram(`ORACLE — CAMPAIGN LIVE\n\nName: ${draft.campaign_name}\nLeads: ${totalAdded}\nInboxes: ${inboxes.join(', ')}${geoLine}\nSchedule: ${campaignTimeFrom}–${campaignTimeTo} ${campaignTimezone}\nInstantly ID: ${campaign.id}\n\nYou can pause or manage this campaign from the ORACLE dashboard.`);
     } catch (_) {}
 
     return { campaign, totalAdded };

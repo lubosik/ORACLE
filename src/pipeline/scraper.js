@@ -28,20 +28,38 @@ function parseEmployeeCount(raw) {
 
 const client = new ApifyClient({ token: process.env.APIFY_API_TOKEN });
 
-export async function scrapeLeads(vertical = 'real_estate') {
+// geoTarget: { city?: string, state?: string, country: string } | null
+export async function scrapeLeads(vertical = 'real_estate', geoTarget = null) {
   const verticalConfig = CONFIG.verticals[vertical];
   if (!verticalConfig) throw new Error(`Unknown vertical: ${vertical}`);
 
-  const input = {
-    ...verticalConfig.apify_input,
-    totalResults: CONFIG.daily_lead_limit
-  };
+  // Start with the vertical's base input, then override geo fields
+  const input = { ...verticalConfig.apify_input, totalResults: CONFIG.daily_lead_limit };
+
+  if (geoTarget) {
+    // Override country to match the targeted market
+    input.personCountry = [geoTarget.country];
+    // City-level targeting (UK)
+    if (geoTarget.city) {
+      input.personCity = [geoTarget.city];
+      delete input.personState;
+    }
+    // State-level targeting (US)
+    if (geoTarget.state) {
+      input.personState = [geoTarget.state];
+      delete input.personCity;
+    }
+  }
+
+  const geoLabel = geoTarget
+    ? (geoTarget.city || geoTarget.state || geoTarget.country)
+    : 'all markets';
 
   await logActivity({
     category: 'scraping',
     level: 'info',
-    message: `Apify scrape started — target: ${CONFIG.daily_lead_limit} leads`,
-    detail: { actor: process.env.APIFY_ACTOR_ID, vertical }
+    message: `Apify scrape started — target: ${CONFIG.daily_lead_limit} leads (${geoLabel})`,
+    detail: { actor: process.env.APIFY_ACTOR_ID, vertical, geo: geoLabel }
   });
 
   const run = await client.actor(process.env.APIFY_ACTOR_ID).call(input);
