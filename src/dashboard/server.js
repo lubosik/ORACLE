@@ -444,22 +444,6 @@ app.post('/api/settings', async (req, res) => {
   }
 });
 
-// ---- NEW: Global on/off toggle (Supabase-backed) ----
-app.post('/api/oracle/toggle', async (req, res) => {
-  try {
-    const { enabled } = req.body;
-    if (typeof enabled !== 'boolean') return res.status(400).json({ error: 'enabled must be boolean' });
-    await setSetting('oracle_enabled', enabled ? 'true' : 'false');
-    await logActivity({
-      category: 'system',
-      level: enabled ? 'success' : 'warning',
-      message: `ORACLE ${enabled ? 'ENABLED' : 'DISABLED'} via dashboard`
-    });
-    res.json({ oracle_enabled: enabled });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
 // ---- NEW: Inbox registry ----
 app.get('/api/inboxes', async (req, res) => {

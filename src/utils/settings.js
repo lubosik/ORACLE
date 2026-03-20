@@ -8,7 +8,9 @@ export async function getSetting(key, fallback = null) {
   if (Date.now() > cacheExpiry) {
     const { data } = await supabase.from('system_settings').select('key, value');
     if (data) {
-      settingsCache = Object.fromEntries(data.map(r => [r.key, r.value]));
+      // Last-write-wins deduplication in case of any legacy duplicate rows
+      settingsCache = {};
+      for (const r of data) settingsCache[r.key] = r.value;
       cacheExpiry = Date.now() + CACHE_TTL_MS;
     }
   }
@@ -16,15 +18,35 @@ export async function getSetting(key, fallback = null) {
 }
 
 export async function setSetting(key, value) {
-  await supabase
+  const strVal = String(value);
+
+  // Check if row already exists
+  const { data: existing } = await supabase
     .from('system_settings')
-    .upsert({ key, value: String(value) }, { onConflict: 'key' });
-  settingsCache[key] = String(value);
-  cacheExpiry = 0;
+    .select('key')
+    .eq('key', key)
+    .maybeSingle();
+
+  if (existing) {
+    await supabase
+      .from('system_settings')
+      .update({ value: strVal })
+      .eq('key', key);
+  } else {
+    await supabase
+      .from('system_settings')
+      .insert({ key, value: strVal });
+  }
+
+  // Always update cache immediately
+  settingsCache[key] = strVal;
+  cacheExpiry = 0; // Force fresh read on next getSetting call
 }
 
+// ORACLE is always enabled when deployed — Telegram approval is the real gate.
+// Individual cron tasks still check this so we can add a pause mechanism later.
 export async function isOracleEnabled() {
-  return (await getSetting('oracle_enabled', 'false')) === 'true';
+  return true;
 }
 
 // Returns the full campaign schedule object for use in Instantly campaign creation

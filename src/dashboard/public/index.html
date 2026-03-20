@@ -196,85 +196,38 @@
       font-family: var(--font-mono);
     }
 
-    /* ---- Engine On/Off Toggle ---- */
-    .engine-toggle-wrap {
+    /* ---- ORACLE Active Badge ---- */
+    .engine-active-badge {
       display: flex;
       align-items: center;
-      gap: 10px;
-      background: rgba(255, 68, 102, 0.08);
-      border: 1px solid rgba(255, 68, 102, 0.35);
-      border-radius: 28px;
-      padding: 7px 16px 7px 10px;
-      cursor: pointer;
-      transition: background 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
-      user-select: none;
-    }
-    .engine-toggle-wrap:hover {
-      box-shadow: 0 0 18px rgba(255, 68, 102, 0.18);
-    }
-    .engine-toggle-wrap.engine-on {
+      gap: 8px;
       background: rgba(0, 232, 150, 0.08);
-      border-color: rgba(0, 232, 150, 0.35);
-    }
-    .engine-toggle-wrap.engine-on:hover {
-      box-shadow: 0 0 18px rgba(0, 232, 150, 0.18);
-    }
-    .toggle-track {
-      width: 36px;
-      height: 20px;
-      border-radius: 10px;
-      background: rgba(255, 68, 102, 0.35);
-      position: relative;
-      transition: background 0.35s ease;
-      flex-shrink: 0;
-    }
-    .engine-toggle-wrap.engine-on .toggle-track {
-      background: rgba(0, 232, 150, 0.5);
-    }
-    .toggle-thumb {
-      width: 14px;
-      height: 14px;
-      border-radius: 50%;
-      background: var(--red);
-      position: absolute;
-      top: 3px;
-      left: 3px;
-      transition: transform 0.3s ease, background 0.35s ease;
-      box-shadow: 0 0 6px rgba(255, 68, 102, 0.6);
-    }
-    .engine-toggle-wrap.engine-on .toggle-thumb {
-      transform: translateX(16px);
-      background: var(--green);
-      box-shadow: 0 0 6px rgba(0, 232, 150, 0.7);
-    }
-    .engine-label {
+      border: 1px solid rgba(0, 232, 150, 0.35);
+      border-radius: 28px;
+      padding: 7px 16px 7px 12px;
       font-size: 11px;
       font-weight: 700;
       letter-spacing: 0.15em;
       text-transform: uppercase;
-      color: var(--red);
+      color: var(--green);
       font-family: var(--font-display);
-      transition: color 0.35s ease;
       white-space: nowrap;
     }
-    .engine-toggle-wrap.engine-on .engine-label {
-      color: var(--green);
+    .engine-active-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 8px rgba(0, 232, 150, 0.8);
+      animation: pulse-green 2s infinite;
+      flex-shrink: 0;
     }
-
-    /* Dim everything except header when engine is off */
-    body.engine-off #app > *:not(header) {
-      opacity: 0.6;
-      transition: opacity 0.4s ease;
-    }
-    body.engine-on #app > *:not(header) {
-      opacity: 1;
-      transition: opacity 0.4s ease;
+    @keyframes pulse-green {
+      0%, 100% { box-shadow: 0 0 6px rgba(0,232,150,0.7); }
+      50% { box-shadow: 0 0 14px rgba(0,232,150,1); }
     }
     .crystal-orb {
       transition: filter 0.4s ease, opacity 0.4s ease;
-    }
-    body.engine-off .crystal-orb {
-      filter: grayscale(0.7) brightness(0.55);
     }
 
     /* ---- Section headings ---- */
@@ -928,11 +881,9 @@
       </div>
     </div>
     <div class="header-right">
-      <div class="engine-toggle-wrap" id="engine-toggle-wrap" onclick="toggleEngine()" title="Toggle ORACLE on or off">
-        <div class="toggle-track">
-          <div class="toggle-thumb" id="toggle-thumb"></div>
-        </div>
-        <span class="engine-label" id="engine-label">ORACLE OFF</span>
+      <div class="engine-active-badge">
+        <span class="engine-active-dot"></span>
+        <span>ORACLE ACTIVE</span>
       </div>
       <div class="status-pill">
         <span class="status-dot" id="main-status-dot"></span>
@@ -1964,49 +1915,6 @@
     renderEmail(idx);
   };
 
-  // ---- Engine on/off ----
-  let _engineEnabled = false;
-
-  function applyEngineUI(enabled) {
-    _engineEnabled = enabled;
-    const wrap = document.getElementById('engine-toggle-wrap');
-    const label = document.getElementById('engine-label');
-    if (enabled) {
-      wrap.classList.add('engine-on');
-      label.textContent = 'ORACLE ON';
-      document.body.classList.add('engine-on');
-      document.body.classList.remove('engine-off');
-    } else {
-      wrap.classList.remove('engine-on');
-      label.textContent = 'ORACLE OFF';
-      document.body.classList.add('engine-off');
-      document.body.classList.remove('engine-on');
-    }
-  }
-
-  async function loadEngineState() {
-    try {
-      const r = await fetch('/api/settings');
-      const s = await r.json();
-      applyEngineUI(s.oracle_enabled === 'true');
-    } catch { applyEngineUI(false); }
-  }
-
-  async function toggleEngine() {
-    const wrap = document.getElementById('engine-toggle-wrap');
-    wrap.style.pointerEvents = 'none';
-    try {
-      const r = await fetch('/api/oracle/toggle', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled: !_engineEnabled })
-      });
-      const d = await r.json();
-      applyEngineUI(d.oracle_enabled === true);
-    } catch (e) { console.error('Toggle failed', e); }
-    wrap.style.pointerEvents = '';
-  }
-
   // ---- Refresh all ----
   async function refreshAll() {
     const btn = document.getElementById('refresh-btn');
@@ -2014,7 +1922,6 @@
     document.getElementById('last-refresh-time').textContent = 'Refreshing...';
 
     await Promise.allSettled([
-      loadEngineState(),
       loadOverview(),
       loadHealth(),
       loadPipeline(),
@@ -2632,7 +2539,6 @@
     document.getElementById('last-refresh-time').textContent = 'Refreshing...';
 
     await Promise.allSettled([
-      loadEngineState(),
       loadOverview(),
       loadHealth(),
       loadPipeline(),
