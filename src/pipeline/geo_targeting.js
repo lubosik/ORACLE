@@ -43,6 +43,13 @@ export const GEO_GROUPS = {
     timezone: 'America/New_York',
     send_hours: { from: '08:00', to: '17:30' },
     targets: [
+      { city: 'Miami' },
+      { city: 'New York City' },
+      { city: 'Atlanta' },
+      { city: 'Boston' },
+      { city: 'Philadelphia' },
+      { city: 'Charlotte' },
+      { city: 'Jacksonville' },
       { state: 'New York' },
       { state: 'Florida' },
       { state: 'Georgia' },
