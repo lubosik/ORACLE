@@ -12,6 +12,7 @@ import { activitySSEHandler } from '../utils/activity.js';
 import { getSetting, setSetting } from '../utils/settings.js';
 import { logActivity } from '../utils/activity.js';
 import { launchApprovedCampaign } from '../pipeline/launch_approved.js';
+import { invalidateAssetsCache } from '../utils/assets.js';
 import logger from '../utils/logger.js';
 import 'dotenv/config';
 
@@ -218,6 +219,10 @@ app.post('/webhook/reply', async (req, res) => {
     const campaignId = payload.campaign_id || '';
     const replyToUuid = payload.reply_to_uuid || payload.uuid || '';
     const threadId = payload.thread_id || '';
+    // Instantly sends step as 0-indexed — convert to 1-indexed for context
+    const emailStep = payload.email_sequence_step != null
+      ? parseInt(payload.email_sequence_step) + 1
+      : (payload.step_number != null ? parseInt(payload.step_number) : null);
 
     const { data: leadData } = await supabase
       .from('seen_leads')
@@ -234,7 +239,8 @@ app.post('/webhook/reply', async (req, res) => {
     const draft = await draftReply({
       lead_name: leadName,
       company_name: companyName,
-      reply_body: replyBody
+      reply_body: replyBody,
+      email_step: emailStep
     });
 
     const { data: logRow } = await supabase
@@ -247,7 +253,8 @@ app.post('/webhook/reply', async (req, res) => {
         reply_to_uuid: replyToUuid,
         inbound_message: replyBody,
         oracle_draft: draft,
-        action: 'pending'
+        action: 'pending',
+        ...(emailStep ? { email_step: emailStep } : {})
       })
       .select()
       .single();
@@ -329,6 +336,63 @@ app.delete('/api/skip-list/:domain', (req, res) => {
 // Mobile view
 app.get('/mobile', (req, res) => {
   res.sendFile(join(__dirname, 'public/mobile.html'));
+});
+
+// ---- Campaign assets CRUD ----
+app.get('/api/assets', async (req, res) => {
+  try {
+    const { data } = await supabase
+      .from('campaign_assets')
+      .select('*')
+      .order('sort_order');
+    res.json(data || []);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/assets', async (req, res) => {
+  try {
+    const { name, category, url, description, use_in_email_2, sort_order } = req.body;
+    if (!name || !category || !url) return res.status(400).json({ error: 'name, category, url required' });
+    const { data, error } = await supabase
+      .from('campaign_assets')
+      .insert({ name, category, url, description, use_in_email_2: !!use_in_email_2, sort_order: sort_order || 0, is_active: true })
+      .select().single();
+    if (error) throw error;
+    invalidateAssetsCache();
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.patch('/api/assets/:id', async (req, res) => {
+  try {
+    const allowed = ['name', 'category', 'url', 'description', 'is_active', 'use_in_email_2', 'sort_order'];
+    const updates = {};
+    for (const k of allowed) if (req.body[k] !== undefined) updates[k] = req.body[k];
+    const { data, error } = await supabase
+      .from('campaign_assets')
+      .update(updates)
+      .eq('id', req.params.id)
+      .select().single();
+    if (error) throw error;
+    invalidateAssetsCache();
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/assets/:id', async (req, res) => {
+  try {
+    await supabase.from('campaign_assets').delete().eq('id', req.params.id);
+    invalidateAssetsCache();
+    res.json({ deleted: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ---- NEW: Activity feed ----

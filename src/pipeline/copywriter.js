@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import logger from '../utils/logger.js';
 import { supabase } from '../utils/supabase.js';
+import { getEmail2Assets, buildAssetLibraryPrompt } from '../utils/assets.js';
 import 'dotenv/config';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -44,10 +45,10 @@ AIRO SOCIAL PROOF ASSETS (use naturally, one at a time, never stack):
 - Speed to lead is the single variable most sales teams are not optimising for
 - Symptoms of a speed-to-lead problem: leads going cold in the database, low conversion despite high volume, sales team chasing no-shows, morale declining
 
-ASSETS ORACLE CAN REFERENCE IN REPLIES AND LATER SEQUENCE STEPS:
+ASSETS ORACLE CAN REFERENCE:
 - VSL: https://airo.velto.ai/
 - Calendly: https://calendly.com/veltoai/airo-discovery-call
-- Voice recordings: referenced as [VOICE RECORDING 1] and [VOICE RECORDING 2]
+- Voice recordings: use [VOICE RECORDING 1] and [VOICE RECORDING 2] as placeholders in Email 2 — they will be replaced with real URLs automatically
 
 Return ONLY valid JSON, no preamble, no markdown, no explanation:
 {
@@ -127,9 +128,32 @@ export async function generateCopyBatch(leads, variantId = 'v1_baseline') {
   const results = [];
   let count = 0;
 
+  // Load voice recordings once for the whole batch
+  const voiceRecordings = await getEmail2Assets();
+  const rec1 = voiceRecordings[0]?.url || null;
+  const rec2 = voiceRecordings[1]?.url || null;
+
+  if (rec1 || rec2) {
+    logger.info('Voice recordings loaded for Email 2', {
+      rec1: rec1 || 'none',
+      rec2: rec2 || 'none'
+    });
+  }
+
   for (const lead of leads) {
     try {
       const copy = await generateCopy(lead, variantId);
+
+      // Replace placeholders in Email 2 with real URLs
+      if (rec1) copy.email_2_body = copy.email_2_body.replace('[VOICE RECORDING 1]', rec1);
+      if (rec2) copy.email_2_body = copy.email_2_body.replace('[VOICE RECORDING 2]', rec2);
+      // Also update Supabase with resolved URLs
+      if (rec1 || rec2) {
+        await supabase.from('lead_copy')
+          .update({ email_2_body: copy.email_2_body })
+          .eq('email', lead.email);
+      }
+
       results.push({ ...lead, copy });
       count++;
     } catch (err) {

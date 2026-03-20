@@ -31,8 +31,8 @@ Was looking at what {{companyName}} is doing with {{INBOUND_SOURCE}} and genuine
 
 Two live call recordings below. Real enquiries, handled by AIRO with no human on the line. Worth 90 seconds before you decide anything.
 
-[VOICE RECORDING 1]
-[VOICE RECORDING 2]
+https://airo.velto.ai/audio/wire-transfer.mp3
+https://airo.velto.ai/audio/not-ai.mp3
 
 The reason I thought of you specifically: most property teams lose deals in the first five minutes after someone enquires. Not because the lead was bad. Because no one got there fast enough. The average team follows up in 4 to 8 hours. AIRO does it in under 60 seconds.
 
