@@ -1,8 +1,8 @@
 import { supabase } from '../utils/supabase.js';
 import { logActivity } from '../utils/activity.js';
 import { getSchedule } from '../utils/settings.js';
+import { sendMailNotification } from '../utils/mailer.js';
 import { writeFile, unlink } from 'fs/promises';
-import { createTransport } from 'nodemailer';
 import logger from '../utils/logger.js';
 
 const DAY_NAMES = { '0':'Sun','1':'Mon','2':'Tue','3':'Wed','4':'Thu','5':'Fri','6':'Sat' };
@@ -84,45 +84,10 @@ Approve from Telegram or the ORACLE dashboard.
 }
 
 async function sendDraftEmail(draft, draftText) {
-  const to = process.env.NOTIFICATION_EMAIL;
-  if (!to) {
-    logger.warn('NOTIFICATION_EMAIL not set — skipping email delivery of campaign draft');
-    return;
-  }
-
-  const transportConfig = process.env.SMTP_HOST ? {
-    host:   process.env.SMTP_HOST,
-    port:   parseInt(process.env.SMTP_PORT || '587'),
-    secure: process.env.SMTP_SECURE === 'true',
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS
-    }
-  } : {
-    // Gmail shorthand — works with an App Password
-    service: 'gmail',
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS
-    }
-  };
-
-  try {
-    const transporter = createTransport(transportConfig);
-    await transporter.sendMail({
-      from: process.env.SMTP_USER,
-      to,
-      subject: `ORACLE — Campaign Ready for Approval: ${draft.campaign_name}`,
-      text: draftText,
-      attachments: [{
-        filename: `${draft.campaign_name}.txt`,
-        content: draftText
-      }]
-    });
-    logger.info('Campaign draft emailed', { to, campaign: draft.campaign_name });
-  } catch (err) {
-    logger.error('Failed to email campaign draft', { error: err.message });
-  }
+  await sendMailNotification({
+    subject: `ORACLE — Campaign Ready for Approval: ${draft.campaign_name}`,
+    text: draftText,
+  });
 }
 
 export async function sendCampaignApprovalRequest(bot, chatId, draft) {
