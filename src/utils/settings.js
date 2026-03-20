@@ -18,8 +18,10 @@ export async function getSetting(key, fallback = null) {
 export async function setSetting(key, value) {
   await supabase
     .from('system_settings')
-    .upsert({ key, value: String(value), updated_at: new Date().toISOString() });
+    .upsert({ key, value: String(value), updated_at: new Date().toISOString() }, { onConflict: 'key' });
+  // Update cache immediately and push out expiry so next read is fresh from DB
   settingsCache[key] = String(value);
+  cacheExpiry = 0;
 }
 
 export async function isOracleEnabled() {
