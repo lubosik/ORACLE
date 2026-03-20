@@ -1,0 +1,1681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ORACLE — The All-Seeing Outreach Engine</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Raleway:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --void: #030308;
+      --deep: #07071a;
+      --surface: #0d0d2b;
+      --card: rgba(15, 15, 40, 0.85);
+      --card-border: rgba(100, 80, 255, 0.18);
+      --card-glow: rgba(100, 80, 255, 0.06);
+      --violet: #7c5cfc;
+      --violet-bright: #9d7eff;
+      --violet-dim: #4a3a9a;
+      --crystal: #b8a8ff;
+      --cyan: #00d4ff;
+      --cyan-dim: rgba(0, 212, 255, 0.15);
+      --gold: #f0c040;
+      --gold-dim: rgba(240, 192, 64, 0.15);
+      --green: #00e896;
+      --green-dim: rgba(0, 232, 150, 0.15);
+      --red: #ff4466;
+      --red-dim: rgba(255, 68, 102, 0.15);
+      --amber: #ffaa00;
+      --text-primary: rgba(220, 210, 255, 0.95);
+      --text-secondary: rgba(160, 145, 210, 0.75);
+      --text-muted: rgba(100, 90, 150, 0.6);
+      --font-display: 'Cinzel', serif;
+      --font-body: 'Raleway', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--void);
+      color: var(--text-primary);
+      font-family: var(--font-body);
+      font-weight: 400;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ---- Starfield background ---- */
+    #starfield {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .star {
+      position: absolute;
+      border-radius: 50%;
+      background: white;
+      animation: twinkle var(--duration, 4s) ease-in-out infinite;
+      animation-delay: var(--delay, 0s);
+    }
+    @keyframes twinkle {
+      0%, 100% { opacity: var(--min-op, 0.1); transform: scale(1); }
+      50% { opacity: var(--max-op, 0.8); transform: scale(1.3); }
+    }
+
+    /* Nebula gradients */
+    .nebula {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(80px);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .nebula-1 {
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(124, 92, 252, 0.12) 0%, transparent 70%);
+      top: -100px; left: -100px;
+      animation: nebulaPulse 8s ease-in-out infinite;
+    }
+    .nebula-2 {
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, rgba(0, 212, 255, 0.08) 0%, transparent 70%);
+      bottom: -50px; right: -50px;
+      animation: nebulaPulse 10s ease-in-out infinite reverse;
+    }
+    .nebula-3 {
+      width: 400px; height: 400px;
+      background: radial-gradient(circle, rgba(240, 192, 64, 0.06) 0%, transparent 70%);
+      top: 40%; left: 50%;
+      transform: translate(-50%, -50%);
+      animation: nebulaPulse 12s ease-in-out infinite;
+    }
+    @keyframes nebulaPulse {
+      0%, 100% { transform: scale(1) translate(0, 0); opacity: 1; }
+      33% { transform: scale(1.1) translate(20px, -10px); opacity: 0.8; }
+      66% { transform: scale(0.9) translate(-10px, 15px); opacity: 0.9; }
+    }
+
+    /* ---- Layout ---- */
+    #app {
+      position: relative;
+      z-index: 1;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 0 24px 80px;
+    }
+
+    /* ---- Header ---- */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 32px 0 40px;
+      border-bottom: 1px solid var(--card-border);
+      margin-bottom: 48px;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    .crystal-orb {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, var(--crystal), var(--violet) 50%, var(--void) 100%);
+      box-shadow:
+        0 0 20px rgba(124, 92, 252, 0.6),
+        0 0 60px rgba(124, 92, 252, 0.3),
+        inset 0 -4px 10px rgba(0,0,0,0.5),
+        inset 0 4px 10px rgba(255,255,255,0.15);
+      animation: orbPulse 3s ease-in-out infinite;
+      flex-shrink: 0;
+    }
+    @keyframes orbPulse {
+      0%, 100% { box-shadow: 0 0 20px rgba(124,92,252,0.6), 0 0 60px rgba(124,92,252,0.3), inset 0 -4px 10px rgba(0,0,0,0.5), inset 0 4px 10px rgba(255,255,255,0.15); }
+      50% { box-shadow: 0 0 30px rgba(124,92,252,0.9), 0 0 90px rgba(124,92,252,0.5), inset 0 -4px 10px rgba(0,0,0,0.5), inset 0 4px 10px rgba(255,255,255,0.2); }
+    }
+    h1 {
+      font-family: var(--font-display);
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      background: linear-gradient(135deg, var(--crystal), var(--violet-bright), var(--cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .header-subtitle {
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      font-weight: 500;
+      margin-top: 4px;
+    }
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(0, 232, 150, 0.1);
+      border: 1px solid rgba(0, 232, 150, 0.25);
+      border-radius: 20px;
+      padding: 6px 14px;
+      font-size: 12px;
+      color: var(--green);
+      font-weight: 500;
+      letter-spacing: 0.05em;
+    }
+    .status-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: statusPulse 2s ease-in-out infinite;
+    }
+    @keyframes statusPulse {
+      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(0,232,150,0.4); }
+      50% { opacity: 0.7; box-shadow: 0 0 0 4px rgba(0,232,150,0); }
+    }
+    .last-refresh {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+
+    /* ---- Engine On/Off Toggle ---- */
+    .engine-toggle-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(255, 68, 102, 0.08);
+      border: 1px solid rgba(255, 68, 102, 0.35);
+      border-radius: 28px;
+      padding: 7px 16px 7px 10px;
+      cursor: pointer;
+      transition: background 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
+      user-select: none;
+    }
+    .engine-toggle-wrap:hover {
+      box-shadow: 0 0 18px rgba(255, 68, 102, 0.18);
+    }
+    .engine-toggle-wrap.engine-on {
+      background: rgba(0, 232, 150, 0.08);
+      border-color: rgba(0, 232, 150, 0.35);
+    }
+    .engine-toggle-wrap.engine-on:hover {
+      box-shadow: 0 0 18px rgba(0, 232, 150, 0.18);
+    }
+    .toggle-track {
+      width: 36px;
+      height: 20px;
+      border-radius: 10px;
+      background: rgba(255, 68, 102, 0.35);
+      position: relative;
+      transition: background 0.35s ease;
+      flex-shrink: 0;
+    }
+    .engine-toggle-wrap.engine-on .toggle-track {
+      background: rgba(0, 232, 150, 0.5);
+    }
+    .toggle-thumb {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--red);
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      transition: transform 0.3s ease, background 0.35s ease;
+      box-shadow: 0 0 6px rgba(255, 68, 102, 0.6);
+    }
+    .engine-toggle-wrap.engine-on .toggle-thumb {
+      transform: translateX(16px);
+      background: var(--green);
+      box-shadow: 0 0 6px rgba(0, 232, 150, 0.7);
+    }
+    .engine-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--red);
+      font-family: var(--font-display);
+      transition: color 0.35s ease;
+      white-space: nowrap;
+    }
+    .engine-toggle-wrap.engine-on .engine-label {
+      color: var(--green);
+    }
+
+    /* Dim everything except header when engine is off */
+    body.engine-off #app > *:not(header) {
+      opacity: 0.6;
+      transition: opacity 0.4s ease;
+    }
+    body.engine-on #app > *:not(header) {
+      opacity: 1;
+      transition: opacity 0.4s ease;
+    }
+    .crystal-orb {
+      transition: filter 0.4s ease, opacity 0.4s ease;
+    }
+    body.engine-off .crystal-orb {
+      filter: grayscale(0.7) brightness(0.55);
+    }
+
+    /* ---- Section headings ---- */
+    .section-heading {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .section-heading h2 {
+      font-family: var(--font-display);
+      font-size: 13px;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      font-weight: 600;
+    }
+    .section-line {
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(to right, var(--card-border), transparent);
+    }
+
+    /* ---- Glass card ---- */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 24px;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+    .card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--card-glow);
+      pointer-events: none;
+      border-radius: inherit;
+    }
+    .card:hover {
+      border-color: rgba(124, 92, 252, 0.35);
+      box-shadow: 0 8px 40px rgba(124, 92, 252, 0.1);
+    }
+
+    /* ---- Stat cards grid ---- */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 48px;
+    }
+    .stat-card {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 20px 24px;
+      backdrop-filter: blur(20px);
+      position: relative;
+      overflow: hidden;
+      transition: all 0.3s ease;
+    }
+    .stat-card::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 2px;
+      background: var(--accent-color, var(--violet));
+      opacity: 0.6;
+    }
+    .stat-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+      border-color: var(--accent-color, var(--violet));
+    }
+    .stat-label {
+      font-size: 10px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+    .stat-value {
+      font-family: var(--font-display);
+      font-size: 36px;
+      font-weight: 700;
+      line-height: 1;
+      color: var(--accent-color, var(--crystal));
+      text-shadow: 0 0 20px rgba(184, 168, 255, 0.4);
+    }
+    .stat-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 6px;
+    }
+    .stat-icon {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      font-size: 22px;
+      opacity: 0.35;
+    }
+
+    /* ---- Two / three column sections ---- */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-bottom: 48px;
+    }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 24px;
+      margin-bottom: 48px;
+    }
+    @media (max-width: 1100px) {
+      .grid-3 { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 800px) {
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    }
+
+    /* ---- Full-width section ---- */
+    .section-full {
+      margin-bottom: 48px;
+    }
+
+    /* ---- System health ---- */
+    .health-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 12px;
+    }
+    .health-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 10px;
+      padding: 12px 14px;
+      transition: all 0.2s;
+    }
+    .health-item:hover { background: rgba(255,255,255,0.05); }
+    .health-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .health-dot.ok { background: var(--green); box-shadow: 0 0 6px var(--green); }
+    .health-dot.warn { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+    .health-dot.error { background: var(--red); box-shadow: 0 0 6px var(--red); }
+    .health-dot.pending { background: var(--text-muted); }
+    .health-name {
+      font-size: 12px;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+    .health-status {
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 1px;
+    }
+
+    /* ---- Campaigns table ---- */
+    .table-wrap {
+      overflow-x: auto;
+      border-radius: 12px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    thead th {
+      font-size: 10px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      font-weight: 600;
+      padding: 10px 16px;
+      text-align: left;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+      white-space: nowrap;
+    }
+    tbody tr {
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      transition: background 0.2s;
+    }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: rgba(124,92,252,0.06); }
+    tbody td {
+      padding: 12px 16px;
+      color: var(--text-secondary);
+      vertical-align: middle;
+    }
+    td.campaign-name {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--crystal);
+      max-width: 280px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .badge-active { background: var(--green-dim); color: var(--green); border: 1px solid rgba(0,232,150,0.25); }
+    .badge-paused { background: var(--gold-dim); color: var(--gold); border: 1px solid rgba(240,192,64,0.25); }
+    .badge-draft { background: rgba(100,90,150,0.2); color: var(--text-muted); border: 1px solid rgba(100,90,150,0.2); }
+    .badge-winner { background: var(--gold-dim); color: var(--gold); border: 1px solid rgba(240,192,64,0.3); }
+    .badge-loser { background: var(--red-dim); color: var(--red); border: 1px solid rgba(255,68,102,0.25); }
+    .badge-inconclusive { background: rgba(100,90,150,0.15); color: var(--text-muted); border: 1px solid rgba(100,90,150,0.2); }
+    .badge-pending { background: var(--cyan-dim); color: var(--cyan); border: 1px solid rgba(0,212,255,0.2); }
+    .rate-value {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .rate-good { color: var(--green); }
+    .rate-ok { color: var(--gold); }
+    .rate-low { color: var(--text-secondary); }
+    .delta-positive { color: var(--green); font-family: var(--font-mono); font-size: 12px; }
+    .delta-negative { color: var(--red); font-family: var(--font-mono); font-size: 12px; }
+    .delta-neutral { color: var(--text-muted); font-family: var(--font-mono); font-size: 12px; }
+
+    /* ---- Experiment ledger ---- */
+    .experiment-row {
+      padding: 16px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 16px;
+      align-items: start;
+    }
+    .experiment-row:last-child { border-bottom: none; }
+    .experiment-variant {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--violet-bright);
+      margin-bottom: 4px;
+    }
+    .experiment-hypothesis {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      margin-bottom: 6px;
+    }
+    .experiment-meta {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+    .experiment-stats {
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    /* ---- Pipeline status card ---- */
+    .pipeline-steps {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 16px;
+    }
+    .pipeline-step {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+    .pipeline-step .step-icon { font-size: 14px; }
+    .pipeline-step .step-count {
+      font-family: var(--font-mono);
+      color: var(--crystal);
+      font-weight: 500;
+    }
+
+    /* ---- Reply queue ---- */
+    .reply-item {
+      padding: 16px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 12px;
+      margin-bottom: 10px;
+      transition: all 0.2s;
+    }
+    .reply-item:hover { border-color: var(--violet-dim); background: rgba(124,92,252,0.05); }
+    .reply-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .reply-from {
+      font-size: 13px;
+      color: var(--crystal);
+      font-weight: 500;
+    }
+    .reply-company {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .reply-preview {
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      font-style: italic;
+      border-left: 2px solid var(--violet-dim);
+      padding-left: 10px;
+      margin-bottom: 10px;
+    }
+    .reply-draft {
+      font-size: 12px;
+      color: var(--green);
+      line-height: 1.5;
+      background: rgba(0,232,150,0.05);
+      border: 1px solid rgba(0,232,150,0.12);
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+
+    /* ---- Base sequence viewer ---- */
+    .sequence-tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+      padding-bottom: 0;
+    }
+    .seq-tab {
+      padding: 8px 20px;
+      font-size: 12px;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      background: none;
+      border: none;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      transition: all 0.2s;
+      font-family: var(--font-body);
+      font-weight: 500;
+    }
+    .seq-tab:hover { color: var(--text-secondary); }
+    .seq-tab.active { color: var(--violet-bright); border-bottom-color: var(--violet-bright); }
+    .seq-content { display: none; }
+    .seq-content.active { display: block; }
+    .email-subject {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--cyan);
+      background: var(--cyan-dim);
+      border: 1px solid rgba(0,212,255,0.15);
+      border-radius: 6px;
+      padding: 6px 12px;
+      margin-bottom: 14px;
+      display: inline-block;
+    }
+    .email-body {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.8;
+      white-space: pre-wrap;
+      font-family: var(--font-body);
+    }
+    .email-delay {
+      font-size: 10px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* ---- Crystal ball section ---- */
+    .crystal-section {
+      display: flex;
+      align-items: center;
+      gap: 32px;
+      margin-bottom: 48px;
+      flex-wrap: wrap;
+    }
+    .crystal-ball-container {
+      position: relative;
+      width: 160px;
+      height: 160px;
+      flex-shrink: 0;
+    }
+    .crystal-ball {
+      width: 160px;
+      height: 160px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%,
+        rgba(220, 210, 255, 0.9),
+        rgba(140, 100, 255, 0.7) 30%,
+        rgba(60, 30, 120, 0.9) 60%,
+        rgba(5, 5, 20, 0.95) 100%
+      );
+      box-shadow:
+        0 0 40px rgba(124,92,252,0.5),
+        0 0 100px rgba(124,92,252,0.25),
+        0 0 200px rgba(124,92,252,0.1),
+        inset 0 -10px 30px rgba(0,0,0,0.6),
+        inset 10px 10px 30px rgba(255,255,255,0.12);
+      animation: crystalFloat 4s ease-in-out infinite, crystalGlow 3s ease-in-out infinite;
+      position: relative;
+      overflow: hidden;
+    }
+    .crystal-ball::after {
+      content: '';
+      position: absolute;
+      top: 18%;
+      left: 22%;
+      width: 30%;
+      height: 20%;
+      background: radial-gradient(ellipse, rgba(255,255,255,0.6), transparent);
+      border-radius: 50%;
+      filter: blur(3px);
+    }
+    @keyframes crystalFloat {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+    @keyframes crystalGlow {
+      0%, 100% { box-shadow: 0 0 40px rgba(124,92,252,0.5), 0 0 100px rgba(124,92,252,0.25), 0 0 200px rgba(124,92,252,0.1), inset 0 -10px 30px rgba(0,0,0,0.6), inset 10px 10px 30px rgba(255,255,255,0.12); }
+      50% { box-shadow: 0 0 60px rgba(124,92,252,0.7), 0 0 140px rgba(124,92,252,0.35), 0 0 280px rgba(124,92,252,0.15), inset 0 -10px 30px rgba(0,0,0,0.6), inset 10px 10px 30px rgba(255,255,255,0.18); }
+    }
+    .crystal-ring {
+      position: absolute;
+      border-radius: 50%;
+      border: 1px solid rgba(124,92,252,0.2);
+      animation: ringExpand 3s ease-out infinite;
+    }
+    .crystal-ring:nth-child(2) { animation-delay: 1s; }
+    .crystal-ring:nth-child(3) { animation-delay: 2s; }
+    @keyframes ringExpand {
+      0% { width: 160px; height: 160px; top: 0; left: 0; opacity: 0.6; }
+      100% { width: 260px; height: 260px; top: -50px; left: -50px; opacity: 0; }
+    }
+    .crystal-stats {
+      flex: 1;
+      min-width: 240px;
+    }
+    .crystal-headline {
+      font-family: var(--font-display);
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--crystal);
+      margin-bottom: 8px;
+      letter-spacing: 0.05em;
+    }
+    .crystal-tagline {
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      margin-bottom: 20px;
+    }
+    .crystal-metric {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .crystal-metric-value {
+      font-family: var(--font-display);
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--violet-bright);
+      min-width: 80px;
+      text-shadow: 0 0 20px rgba(157,126,255,0.5);
+    }
+    .crystal-metric-label {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .crystal-metric-bar {
+      flex: 1;
+      height: 4px;
+      background: rgba(255,255,255,0.07);
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+    .crystal-metric-fill {
+      height: 100%;
+      background: linear-gradient(to right, var(--violet), var(--cyan));
+      border-radius: 4px;
+      transition: width 1s ease;
+    }
+
+    /* ---- Scrollbar ---- */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); }
+    ::-webkit-scrollbar-thumb { background: rgba(124,92,252,0.3); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(124,92,252,0.5); }
+
+    /* ---- Loading skeleton ---- */
+    .skeleton {
+      background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%);
+      background-size: 400% 100%;
+      animation: shimmer 1.8s ease-in-out infinite;
+      border-radius: 6px;
+    }
+    @keyframes shimmer {
+      0% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    /* ---- Empty state ---- */
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+    .empty-state .empty-icon { font-size: 32px; margin-bottom: 10px; opacity: 0.4; }
+
+    /* ---- Refresh button ---- */
+    .refresh-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(124,92,252,0.1);
+      border: 1px solid rgba(124,92,252,0.25);
+      color: var(--violet-bright);
+      border-radius: 8px;
+      padding: 7px 14px;
+      font-size: 12px;
+      font-family: var(--font-body);
+      cursor: pointer;
+      transition: all 0.2s;
+      font-weight: 500;
+    }
+    .refresh-btn:hover { background: rgba(124,92,252,0.2); transform: translateY(-1px); }
+    .refresh-btn.spinning svg { animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ---- Card header ---- */
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .card-title {
+      font-family: var(--font-display);
+      font-size: 13px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      font-weight: 600;
+    }
+    .card-badge {
+      font-size: 10px;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+      background: rgba(255,255,255,0.05);
+      padding: 3px 8px;
+      border-radius: 4px;
+    }
+
+    /* ---- Number counter animation ---- */
+    .count-up { display: inline-block; }
+
+    /* ---- Footer ---- */
+    footer {
+      text-align: center;
+      padding: 32px 0;
+      border-top: 1px solid rgba(255,255,255,0.05);
+      color: var(--text-muted);
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      font-family: var(--font-mono);
+    }
+
+    /* ---- Progress bar for experiments ---- */
+    .exp-progress {
+      height: 3px;
+      background: rgba(255,255,255,0.07);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+    .exp-progress-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.8s ease;
+    }
+
+    /* ---- Tooltip ---- */
+    [data-tip] { position: relative; cursor: help; }
+    [data-tip]:hover::after {
+      content: attr(data-tip);
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(20,20,50,0.95);
+      border: 1px solid var(--card-border);
+      color: var(--text-secondary);
+      font-size: 11px;
+      padding: 6px 10px;
+      border-radius: 6px;
+      white-space: nowrap;
+      z-index: 100;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+<div id="starfield"></div>
+<div class="nebula nebula-1"></div>
+<div class="nebula nebula-2"></div>
+<div class="nebula nebula-3"></div>
+
+<div id="app">
+
+  <!-- HEADER -->
+  <header>
+    <div class="header-left">
+      <div class="crystal-orb"></div>
+      <div>
+        <h1>ORACLE</h1>
+        <div class="header-subtitle">Outreach Research Autonomous Campaign Learning Engine</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="engine-toggle-wrap" id="engine-toggle-wrap" onclick="toggleEngine()" title="Toggle ORACLE on or off">
+        <div class="toggle-track">
+          <div class="toggle-thumb" id="toggle-thumb"></div>
+        </div>
+        <span class="engine-label" id="engine-label">ORACLE OFF</span>
+      </div>
+      <div class="status-pill">
+        <span class="status-dot" id="main-status-dot"></span>
+        <span id="main-status-text">Watching</span>
+      </div>
+      <div class="last-refresh" id="last-refresh-time">Refreshing...</div>
+      <button class="refresh-btn" id="refresh-btn" onclick="refreshAll()">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="23 4 23 10 17 10"></polyline>
+          <polyline points="1 20 1 14 7 14"></polyline>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+        </svg>
+        Refresh
+      </button>
+    </div>
+  </header>
+
+  <!-- CRYSTAL BALL SECTION -->
+  <div class="crystal-section">
+    <div class="crystal-ball-container">
+      <div class="crystal-ball"></div>
+      <div class="crystal-ring"></div>
+      <div class="crystal-ring"></div>
+      <div class="crystal-ring"></div>
+    </div>
+    <div class="crystal-stats">
+      <div class="crystal-headline">The Oracle Sees All</div>
+      <div class="crystal-tagline">Autonomous cold outreach for AIRO. Scraping leads, enriching context, verifying emails, generating personalised copy, and self-optimising every campaign cycle — while you sleep.</div>
+      <div class="crystal-metric">
+        <div>
+          <div class="crystal-metric-value" id="crystal-reply-rate">—</div>
+          <div class="crystal-metric-label">Current positive reply rate</div>
+          <div class="crystal-metric-bar"><div class="crystal-metric-fill" id="crystal-reply-bar" style="width:0%"></div></div>
+        </div>
+      </div>
+      <div class="crystal-metric">
+        <div>
+          <div class="crystal-metric-value" id="crystal-baseline">—</div>
+          <div class="crystal-metric-label">Active baseline (best variant)</div>
+          <div class="crystal-metric-bar"><div class="crystal-metric-fill" id="crystal-baseline-bar" style="width:0%;background:linear-gradient(to right,var(--gold),var(--amber))"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 1: KPI STATS -->
+  <div class="section-heading">
+    <h2>Mission Stats</h2>
+    <div class="section-line"></div>
+  </div>
+  <div class="stats-grid" id="stats-grid">
+    <div class="stat-card" style="--accent-color: var(--violet)">
+      <div class="stat-icon">👥</div>
+      <div class="stat-label">Total Leads in DB</div>
+      <div class="stat-value skeleton" style="height:36px;width:80px" id="stat-leads">&nbsp;</div>
+      <div class="stat-sub">Deduplicated, global</div>
+    </div>
+    <div class="stat-card" style="--accent-color: var(--cyan)">
+      <div class="stat-icon">📤</div>
+      <div class="stat-label">Emails Sent (all time)</div>
+      <div class="stat-value skeleton" style="height:36px;width:80px" id="stat-sent">&nbsp;</div>
+      <div class="stat-sub">Across all campaigns</div>
+    </div>
+    <div class="stat-card" style="--accent-color: var(--gold)">
+      <div class="stat-icon">👁</div>
+      <div class="stat-label">Open Rate</div>
+      <div class="stat-value skeleton" style="height:36px;width:80px" id="stat-opens">&nbsp;</div>
+      <div class="stat-sub">Unique opens</div>
+    </div>
+    <div class="stat-card" style="--accent-color: var(--green)">
+      <div class="stat-icon">💬</div>
+      <div class="stat-label">Positive Reply Rate</div>
+      <div class="stat-value skeleton" style="height:36px;width:80px" id="stat-replies">&nbsp;</div>
+      <div class="stat-sub">Excl. OOO &amp; auto-replies</div>
+    </div>
+    <div class="stat-card" style="--accent-color: var(--violet-bright)">
+      <div class="stat-icon">🔬</div>
+      <div class="stat-label">Active Experiments</div>
+      <div class="stat-value skeleton" style="height:36px;width:80px" id="stat-experiments">&nbsp;</div>
+      <div class="stat-sub">Pending scoring</div>
+    </div>
+    <div class="stat-card" style="--accent-color: var(--amber)">
+      <div class="stat-icon">🏆</div>
+      <div class="stat-label">Current Baseline</div>
+      <div class="stat-value skeleton" style="height:36px;width:80px" id="stat-baseline">&nbsp;</div>
+      <div class="stat-sub">Best variant promoted</div>
+    </div>
+  </div>
+
+  <!-- SECTION 2: SYSTEM HEALTH + PIPELINE STATUS -->
+  <div class="grid-2">
+    <!-- System Health -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">System Health</div>
+        <div class="card-badge" id="health-updated">checking...</div>
+      </div>
+      <div class="health-grid" id="health-grid">
+        <div class="health-item">
+          <div class="health-dot pending"></div>
+          <div><div class="health-name">Supabase</div><div class="health-status">checking</div></div>
+        </div>
+        <div class="health-item">
+          <div class="health-dot pending"></div>
+          <div><div class="health-name">Instantly</div><div class="health-status">checking</div></div>
+        </div>
+        <div class="health-item">
+          <div class="health-dot pending"></div>
+          <div><div class="health-name">Anthropic</div><div class="health-status">checking</div></div>
+        </div>
+        <div class="health-item">
+          <div class="health-dot pending"></div>
+          <div><div class="health-name">Grok xAI</div><div class="health-status">checking</div></div>
+        </div>
+        <div class="health-item">
+          <div class="health-dot pending"></div>
+          <div><div class="health-name">Apify</div><div class="health-status">checking</div></div>
+        </div>
+        <div class="health-item">
+          <div class="health-dot pending"></div>
+          <div><div class="health-name">Telegram</div><div class="health-status">checking</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pipeline Status -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Last Pipeline Run</div>
+        <div id="pipeline-status-badge"></div>
+      </div>
+      <div id="pipeline-content">
+        <div class="skeleton" style="height:14px;width:60%;margin-bottom:8px"></div>
+        <div class="skeleton" style="height:14px;width:40%"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 3: CAMPAIGNS TABLE -->
+  <div class="section-full">
+    <div class="section-heading">
+      <h2>Active Campaigns</h2>
+      <div class="section-line"></div>
+    </div>
+    <div class="card">
+      <div class="table-wrap">
+        <table id="campaigns-table">
+          <thead>
+            <tr>
+              <th>Campaign Name</th>
+              <th>Status</th>
+              <th>Sent</th>
+              <th>Open Rate</th>
+              <th>Reply Rate</th>
+              <th>Positive Rate</th>
+              <th>Variant</th>
+            </tr>
+          </thead>
+          <tbody id="campaigns-tbody">
+            <tr><td colspan="7" class="empty-state">Loading campaigns...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 4: EXPERIMENT LEDGER + REPLY QUEUE -->
+  <div class="grid-2">
+    <!-- Experiment Ledger -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Experiment Ledger</div>
+        <div class="card-badge" id="exp-count">loading</div>
+      </div>
+      <div id="experiments-list">
+        <div class="skeleton" style="height:60px;margin-bottom:8px;border-radius:10px"></div>
+        <div class="skeleton" style="height:60px;margin-bottom:8px;border-radius:10px"></div>
+        <div class="skeleton" style="height:60px;border-radius:10px"></div>
+      </div>
+    </div>
+
+    <!-- Reply Queue -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Reply Queue</div>
+        <div class="card-badge" id="reply-count">loading</div>
+      </div>
+      <div id="reply-queue-list">
+        <div class="skeleton" style="height:80px;margin-bottom:8px;border-radius:10px"></div>
+        <div class="skeleton" style="height:80px;border-radius:10px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 5: BASE SEQUENCE VIEWER -->
+  <div class="section-full">
+    <div class="section-heading">
+      <h2>Current Sequence</h2>
+      <div class="section-line"></div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Base Sequence — v1_baseline</div>
+        <div class="card-badge" id="sequence-variant-badge">real_estate / AIRO</div>
+      </div>
+      <div class="sequence-tabs" id="sequence-tabs">
+        <button class="seq-tab active" onclick="showEmail(0)" id="tab-0">Email 1</button>
+        <button class="seq-tab" onclick="showEmail(1)" id="tab-1">Email 2</button>
+        <button class="seq-tab" onclick="showEmail(2)" id="tab-2">Email 3</button>
+        <button class="seq-tab" onclick="showEmail(3)" id="tab-3">Email 4</button>
+      </div>
+      <div id="sequence-content">
+        <div class="skeleton" style="height:200px;border-radius:10px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer>
+    ORACLE v1.0 &mdash; Velto AI &mdash; The crystal ball never stops spinning
+  </footer>
+
+  <!-- SECTION 6: SETTINGS — SKIP LIST -->
+  <div class="section-full" id="settings-section">
+    <div class="section-heading">
+      <h2>Settings</h2>
+      <div class="section-line"></div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Client &amp; Skip List</div>
+        <div class="card-badge" id="skip-count">0 domains</div>
+      </div>
+      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:20px;line-height:1.6;">
+        Any lead whose company website or email domain matches an entry below will be automatically skipped — current clients, warm conversations, anyone you don't want touched. Paste a full URL or just the domain.
+      </p>
+
+      <!-- Add domain input -->
+      <div style="display:flex;gap:10px;margin-bottom:24px;flex-wrap:wrap;">
+        <input
+          id="skip-domain-input"
+          type="text"
+          placeholder="e.g. acmecorp.com or https://www.acmecorp.com/"
+          style="
+            flex:1;min-width:240px;
+            background:rgba(255,255,255,0.04);
+            border:1px solid var(--card-border);
+            border-radius:10px;
+            padding:10px 14px;
+            color:var(--text-primary);
+            font-family:var(--font-body);
+            font-size:13px;
+            outline:none;
+            transition:border-color 0.2s;
+          "
+          onkeydown="if(event.key==='Enter')addSkipDomain()"
+          onfocus="this.style.borderColor='rgba(124,92,252,0.5)'"
+          onblur="this.style.borderColor=''"
+        />
+        <button onclick="addSkipDomain()" style="
+          background:rgba(124,92,252,0.15);
+          border:1px solid rgba(124,92,252,0.4);
+          border-radius:10px;
+          padding:10px 20px;
+          color:var(--violet-bright);
+          font-family:var(--font-display);
+          font-size:11px;
+          letter-spacing:0.1em;
+          cursor:pointer;
+          transition:all 0.2s;
+          white-space:nowrap;
+        " onmouseover="this.style.background='rgba(124,92,252,0.25)'" onmouseout="this.style.background='rgba(124,92,252,0.15)'">
+          + Add &amp; Save
+        </button>
+      </div>
+
+      <!-- Domain list -->
+      <div id="skip-domains-list" style="display:flex;flex-wrap:wrap;gap:8px;">
+        <div class="skeleton" style="width:160px;height:34px;border-radius:20px;"></div>
+        <div class="skeleton" style="width:140px;height:34px;border-radius:20px;"></div>
+        <div class="skeleton" style="width:180px;height:34px;border-radius:20px;"></div>
+      </div>
+      <div id="skip-save-confirm" style="display:none;margin-top:14px;font-size:12px;color:var(--green);font-family:var(--font-mono);"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // ---- Starfield ----
+  (function() {
+    const sf = document.getElementById('starfield');
+    for (let i = 0; i < 180; i++) {
+      const s = document.createElement('div');
+      s.className = 'star';
+      const size = Math.random() * 2.5 + 0.5;
+      s.style.cssText = `
+        width:${size}px;height:${size}px;
+        top:${Math.random()*100}%;left:${Math.random()*100}%;
+        --duration:${3+Math.random()*6}s;
+        --delay:${-Math.random()*8}s;
+        --min-op:${0.05+Math.random()*0.15};
+        --max-op:${0.4+Math.random()*0.6};
+      `;
+      sf.appendChild(s);
+    }
+  })();
+
+  // ---- State ----
+  let sequenceEmails = [];
+  let activeEmailTab = 0;
+
+  // ---- Utilities ----
+  function fmt(n) {
+    if (n === null || n === undefined) return '—';
+    if (typeof n === 'number') return n.toLocaleString();
+    return n;
+  }
+  function fmtPct(v) {
+    if (v === null || v === undefined || v === '0.00') return '—';
+    return v + '%';
+  }
+  function rateClass(v) {
+    const n = parseFloat(v);
+    if (isNaN(n)) return '';
+    if (n >= 3) return 'rate-good';
+    if (n >= 1) return 'rate-ok';
+    return 'rate-low';
+  }
+  function statusBadge(s) {
+    s = (s || '').toLowerCase();
+    if (s === 'active') return '<span class="badge badge-active">active</span>';
+    if (s === 'paused') return '<span class="badge badge-paused">paused</span>';
+    return '<span class="badge badge-draft">' + (s || 'unknown') + '</span>';
+  }
+  function outcomeBadge(o) {
+    if (!o) return '';
+    const map = { winner:'badge-winner', loser:'badge-loser', inconclusive:'badge-inconclusive', pending:'badge-pending' };
+    return `<span class="badge ${map[o]||'badge-pending'}">${o}</span>`;
+  }
+  function deltaHtml(d) {
+    if (d === null || d === undefined) return '<span class="delta-neutral">—</span>';
+    const n = parseFloat(d) * 100;
+    if (isNaN(n)) return '<span class="delta-neutral">—</span>';
+    const s = n >= 0 ? `+${n.toFixed(2)}pp` : `${n.toFixed(2)}pp`;
+    if (n > 0) return `<span class="delta-positive">${s}</span>`;
+    if (n < 0) return `<span class="delta-negative">${s}</span>`;
+    return `<span class="delta-neutral">${s}</span>`;
+  }
+  function timeAgo(ts) {
+    if (!ts) return 'never';
+    const diff = Date.now() - new Date(ts).getTime();
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return 'just now';
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    return `${Math.floor(h/24)}d ago`;
+  }
+  function pipelineStatusBadge(s) {
+    const map = { complete:'badge-active', error:'badge-loser', running:'badge-pending', interrupted:'badge-paused' };
+    return `<span class="badge ${map[s]||'badge-draft'}">${s||'unknown'}</span>`;
+  }
+
+  // ---- Remove skeleton class ----
+  function clearSkeleton(id) {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('skeleton');
+  }
+
+  // ---- Fetch overview ----
+  async function loadOverview() {
+    try {
+      const r = await fetch('/api/overview');
+      const d = await r.json();
+
+      const leads = d.total_leads;
+      const sent = d.total_emails_sent;
+      const openR = d.open_rate;
+      const replyR = d.positive_reply_rate;
+      const exps = d.active_experiments;
+      const baseline = d.current_baseline;
+
+      clearSkeleton('stat-leads');
+      clearSkeleton('stat-sent');
+      clearSkeleton('stat-opens');
+      clearSkeleton('stat-replies');
+      clearSkeleton('stat-experiments');
+      clearSkeleton('stat-baseline');
+
+      document.getElementById('stat-leads').textContent = fmt(leads);
+      document.getElementById('stat-sent').textContent = fmt(sent);
+      document.getElementById('stat-opens').textContent = fmtPct(openR);
+      document.getElementById('stat-replies').innerHTML = `<span class="${rateClass(replyR)}">${fmtPct(replyR)}</span>`;
+      document.getElementById('stat-experiments').textContent = fmt(exps);
+      document.getElementById('stat-baseline').textContent = baseline ? baseline + '%' : '—';
+
+      // Crystal ball
+      document.getElementById('crystal-reply-rate').textContent = fmtPct(replyR);
+      document.getElementById('crystal-baseline').textContent = baseline ? baseline + '%' : '—';
+      const replyPct = Math.min((parseFloat(replyR)||0) / 8 * 100, 100);
+      const baselinePct = Math.min((parseFloat(baseline)||0) / 8 * 100, 100);
+      document.getElementById('crystal-reply-bar').style.width = replyPct + '%';
+      document.getElementById('crystal-baseline-bar').style.width = baselinePct + '%';
+    } catch(e) {
+      console.error('Overview error:', e);
+    }
+  }
+
+  // ---- Fetch health ----
+  async function loadHealth() {
+    try {
+      const r = await fetch('/api/health');
+      const d = await r.json();
+      const grid = document.getElementById('health-grid');
+      const items = [
+        { key: 'supabase', name: 'Supabase', detail: d.supabase },
+        { key: 'instantly', name: 'Instantly', detail: d.instantly },
+        { key: 'anthropic', name: 'Anthropic', detail: d.anthropic },
+        { key: 'grok', name: 'Grok xAI', detail: d.grok },
+        { key: 'apify', name: 'Apify', detail: d.apify },
+        { key: 'telegram', name: 'Telegram', detail: d.telegram }
+      ];
+      grid.innerHTML = items.map(item => {
+        const st = item.detail?.status || 'unknown';
+        const dotClass = (st === 'connected' || st === 'configured') ? 'ok'
+          : (st === 'error' || st === 'missing') ? 'error' : 'warn';
+        const sub = st === 'connected' && item.detail?.lead_count !== undefined
+          ? `${item.detail.lead_count.toLocaleString()} leads`
+          : st;
+        return `<div class="health-item">
+          <div class="health-dot ${dotClass}"></div>
+          <div><div class="health-name">${item.name}</div><div class="health-status">${sub}</div></div>
+        </div>`;
+      }).join('');
+      document.getElementById('health-updated').textContent = 'as of ' + new Date().toLocaleTimeString();
+    } catch(e) {
+      document.getElementById('health-updated').textContent = 'check failed';
+    }
+  }
+
+  // ---- Fetch pipeline ----
+  async function loadPipeline() {
+    try {
+      const r = await fetch('/api/pipeline');
+      const d = await r.json();
+      const el = document.getElementById('pipeline-content');
+      if (!d || !d.id) {
+        el.innerHTML = '<div class="empty-state"><div class="empty-icon">🔮</div>No pipeline runs yet</div>';
+        return;
+      }
+      const statusBadgeHtml = pipelineStatusBadge(d.status);
+      document.getElementById('pipeline-status-badge').innerHTML = statusBadgeHtml;
+      const dur = d.duration_ms ? (d.duration_ms / 1000).toFixed(0) + 's' : '—';
+      el.innerHTML = `
+        <div style="font-size:11px;color:var(--text-muted);font-family:var(--font-mono);margin-bottom:14px">
+          ${d.started_at ? timeAgo(d.started_at) : '—'} &middot; ${dur} &middot; ${d.variant_id || '—'}
+        </div>
+        <div class="pipeline-steps">
+          <div class="pipeline-step"><span class="step-icon">🕷</span> Scraped <span class="step-count">${fmt(d.scraped_count)}</span></div>
+          <div class="pipeline-step"><span class="step-icon">🔁</span> Deduped <span class="step-count">${fmt(d.dedupe_skipped)}</span></div>
+          <div class="pipeline-step"><span class="step-icon">✨</span> Enriched <span class="step-count">${fmt(d.enriched_count)}</span></div>
+          <div class="pipeline-step"><span class="step-icon">✅</span> Verified <span class="step-count">${fmt(d.verified_count)}</span></div>
+          <div class="pipeline-step"><span class="step-icon">✍️</span> Copy <span class="step-count">${fmt(d.copy_generated_count)}</span></div>
+          <div class="pipeline-step"><span class="step-icon">🚀</span> Launched <span class="step-count">${fmt(d.added_to_campaign)}</span></div>
+        </div>
+        ${d.error_message ? `<div style="margin-top:12px;font-size:12px;color:var(--red);font-family:var(--font-mono);background:var(--red-dim);border:1px solid rgba(255,68,102,0.2);border-radius:8px;padding:8px 12px">Error: ${d.error_message}</div>` : ''}
+      `;
+    } catch(e) {
+      document.getElementById('pipeline-content').innerHTML = '<div class="empty-state">Failed to load pipeline status</div>';
+    }
+  }
+
+  // ---- Fetch campaigns ----
+  async function loadCampaigns() {
+    try {
+      const r = await fetch('/api/campaigns');
+      const campaigns = await r.json();
+      const tbody = document.getElementById('campaigns-tbody');
+      if (!campaigns.length) {
+        tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">📭</div>No campaigns yet</div></td></tr>';
+        return;
+      }
+      tbody.innerHTML = campaigns.slice(0, 20).map(c => {
+        const st = c.stats;
+        const openR = st?.open_rate ? (st.open_rate * 100).toFixed(1) : null;
+        const replyR = st ? (((st.replies_unique||0) / Math.max(st.emails_sent||1, 1)) * 100).toFixed(1) : null;
+        const posR = st?.positive_reply_rate ? (st.positive_reply_rate * 100).toFixed(1) : null;
+        const variantId = c.name?.match(/ORACLE_AIRO_RE_([^_]+(?:_[^_]+)*?)_\d{4}-\d{2}-\d{2}/)?.[1] || '—';
+        return `<tr>
+          <td class="campaign-name" title="${c.name || ''}">${c.name || '—'}</td>
+          <td>${statusBadge(c.status)}</td>
+          <td><span class="rate-value">${fmt(st?.emails_sent || 0)}</span></td>
+          <td><span class="rate-value ${rateClass(openR)}">${openR ? openR + '%' : '—'}</span></td>
+          <td><span class="rate-value ${rateClass(replyR)}">${replyR ? replyR + '%' : '—'}</span></td>
+          <td><span class="rate-value ${rateClass(posR)}">${posR ? posR + '%' : '—'}</span></td>
+          <td><span style="font-family:var(--font-mono);font-size:10px;color:var(--violet-bright)">${variantId}</span></td>
+        </tr>`;
+      }).join('');
+    } catch(e) {
+      document.getElementById('campaigns-tbody').innerHTML = '<tr><td colspan="7"><div class="empty-state">Failed to load campaigns</div></td></tr>';
+    }
+  }
+
+  // ---- Fetch experiments ----
+  async function loadExperiments() {
+    try {
+      const r = await fetch('/api/experiments');
+      const exps = await r.json();
+      document.getElementById('exp-count').textContent = exps.length + ' total';
+      const el = document.getElementById('experiments-list');
+      if (!exps.length) {
+        el.innerHTML = '<div class="empty-state"><div class="empty-icon">🧬</div>No experiments yet. The loop is warming up.</div>';
+        return;
+      }
+      el.innerHTML = exps.slice(0, 8).map(e => {
+        const rate = e.positive_reply_rate ? (e.positive_reply_rate * 100).toFixed(2) + '%' : null;
+        const sends = e.sends || 0;
+        const minSends = 150;
+        const progress = Math.min((sends / minSends) * 100, 100);
+        const progressColor = e.outcome === 'winner' ? 'var(--gold)'
+          : e.outcome === 'loser' ? 'var(--red)'
+          : e.outcome === 'pending' ? 'var(--cyan)'
+          : 'var(--violet)';
+        return `<div class="experiment-row">
+          <div>
+            <div class="experiment-variant">${e.variant_id}</div>
+            <div class="experiment-hypothesis">${e.hypothesis || e.what_changed || 'No hypothesis recorded'}</div>
+            <div class="experiment-meta">
+              ${e.launched_at ? timeAgo(e.launched_at) : 'not launched'} &middot; ${fmt(sends)} sends
+              ${e.delta !== null && e.delta !== undefined ? ' &middot; ' + deltaHtml(e.delta) : ''}
+            </div>
+            <div class="exp-progress">
+              <div class="exp-progress-fill" style="width:${progress}%;background:${progressColor}"></div>
+            </div>
+          </div>
+          <div class="experiment-stats">
+            ${outcomeBadge(e.outcome)}
+            ${rate ? `<div style="margin-top:8px;font-family:var(--font-mono);font-size:13px;color:var(--crystal)">${rate}</div>` : ''}
+          </div>
+        </div>`;
+      }).join('');
+    } catch(e) {
+      document.getElementById('experiments-list').innerHTML = '<div class="empty-state">Failed to load experiments</div>';
+    }
+  }
+
+  // ---- Fetch reply queue ----
+  async function loadReplies() {
+    try {
+      const r = await fetch('/api/reply-queue');
+      const replies = await r.json();
+      document.getElementById('reply-count').textContent = replies.length + ' pending';
+      const el = document.getElementById('reply-queue-list');
+      if (!replies.length) {
+        el.innerHTML = '<div class="empty-state"><div class="empty-icon">📬</div>No pending replies. Inbox clear.</div>';
+        return;
+      }
+      el.innerHTML = replies.slice(0, 5).map(rep => {
+        const preview = (rep.inbound_message || '').slice(0, 180);
+        const draft = (rep.oracle_draft || '').slice(0, 250);
+        return `<div class="reply-item">
+          <div class="reply-header">
+            <div>
+              <div class="reply-from">${rep.lead_email || 'Unknown'}</div>
+              <div class="reply-company">${rep.company_name || ''} &middot; ${timeAgo(rep.created_at)}</div>
+            </div>
+            <span class="badge badge-pending">pending</span>
+          </div>
+          ${preview ? `<div class="reply-preview">${preview}${preview.length < (rep.inbound_message||'').length ? '...' : ''}</div>` : ''}
+          ${draft ? `<div class="reply-draft"><strong style="font-size:10px;opacity:0.7;display:block;margin-bottom:4px;letter-spacing:0.1em">ORACLE DRAFT:</strong>${draft}${draft.length < (rep.oracle_draft||'').length ? '...' : ''}</div>` : ''}
+        </div>`;
+      }).join('');
+    } catch(e) {
+      document.getElementById('reply-queue-list').innerHTML = '<div class="empty-state">Failed to load reply queue</div>';
+    }
+  }
+
+  // ---- Fetch sequence ----
+  async function loadSequence() {
+    try {
+      const r = await fetch('/api/copy');
+      const d = await r.json();
+      const seq = d.base_sequence;
+      if (!seq || !seq.emails) return;
+      sequenceEmails = seq.emails;
+      document.getElementById('sequence-variant-badge').textContent = seq.vertical + ' / ' + seq.product;
+      renderEmail(activeEmailTab);
+    } catch(e) {
+      document.getElementById('sequence-content').innerHTML = '<div class="empty-state">Failed to load sequence</div>';
+    }
+  }
+
+  function renderEmail(idx) {
+    const email = sequenceEmails[idx];
+    if (!email) return;
+    const el = document.getElementById('sequence-content');
+    el.innerHTML = `
+      <div class="email-delay">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Day ${email.delay_days === 0 ? '0 (immediate)' : email.delay_days}
+      </div>
+      <div class="email-subject">Subject: ${email.subject}</div>
+      <div class="email-body">${(email.body || '').replace(/</g,'&lt;')}</div>
+    `;
+  }
+
+  window.showEmail = function(idx) {
+    activeEmailTab = idx;
+    document.querySelectorAll('.seq-tab').forEach((t,i) => t.classList.toggle('active', i === idx));
+    renderEmail(idx);
+  };
+
+  // ---- Engine on/off ----
+  let _engineEnabled = false;
+
+  function applyEngineUI(enabled) {
+    _engineEnabled = enabled;
+    const wrap = document.getElementById('engine-toggle-wrap');
+    const label = document.getElementById('engine-label');
+    if (enabled) {
+      wrap.classList.add('engine-on');
+      label.textContent = 'ORACLE ON';
+      document.body.classList.add('engine-on');
+      document.body.classList.remove('engine-off');
+    } else {
+      wrap.classList.remove('engine-on');
+      label.textContent = 'ORACLE OFF';
+      document.body.classList.add('engine-off');
+      document.body.classList.remove('engine-on');
+    }
+  }
+
+  async function loadEngineState() {
+    try {
+      const r = await fetch('/api/engine/state');
+      const data = await r.json();
+      applyEngineUI(data.enabled === true);
+    } catch { applyEngineUI(false); }
+  }
+
+  async function toggleEngine() {
+    const wrap = document.getElementById('engine-toggle-wrap');
+    wrap.style.pointerEvents = 'none';
+    try {
+      const r = await fetch('/api/engine/state', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: !_engineEnabled })
+      });
+      const data = await r.json();
+      applyEngineUI(data.enabled === true);
+    } catch (e) { console.error('Toggle failed', e); }
+    wrap.style.pointerEvents = '';
+  }
+
+  // ---- Refresh all ----
+  async function refreshAll() {
+    const btn = document.getElementById('refresh-btn');
+    btn.classList.add('spinning');
+    document.getElementById('last-refresh-time').textContent = 'Refreshing...';
+
+    await Promise.allSettled([
+      loadEngineState(),
+      loadOverview(),
+      loadHealth(),
+      loadPipeline(),
+      loadCampaigns(),
+      loadExperiments(),
+      loadReplies(),
+      loadSequence(),
+      loadSkipList()
+    ]);
+
+    btn.classList.remove('spinning');
+    document.getElementById('last-refresh-time').textContent = 'Last refresh: ' + new Date().toLocaleTimeString();
+  }
+
+  // ---- Skip list ----
+  async function loadSkipList() {
+    try {
+      const r = await fetch('/api/skip-list');
+      const data = await r.json();
+      const domains = data.domains || [];
+      document.getElementById('skip-count').textContent = domains.length + ' domain' + (domains.length !== 1 ? 's' : '');
+      const el = document.getElementById('skip-domains-list');
+      if (!domains.length) {
+        el.innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:8px 0;">No domains skipped yet.</div>';
+        return;
+      }
+      el.innerHTML = domains.map(d => `
+        <div style="
+          display:inline-flex;align-items:center;gap:8px;
+          background:rgba(255,68,102,0.08);
+          border:1px solid rgba(255,68,102,0.25);
+          border-radius:20px;padding:6px 12px 6px 14px;
+          font-size:12px;font-family:var(--font-mono);color:var(--text-primary);
+        ">
+          <span>${d}</span>
+          <span onclick="removeSkipDomain('${d}')" title="Remove" style="
+            cursor:pointer;color:var(--red);opacity:0.7;font-size:14px;line-height:1;
+            padding:0 2px;transition:opacity 0.2s;
+          " onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">×</span>
+        </div>
+      `).join('');
+    } catch (e) {
+      document.getElementById('skip-domains-list').innerHTML = '<div style="color:var(--red);font-size:12px;">Failed to load skip list</div>';
+    }
+  }
+
+  async function addSkipDomain() {
+    const input = document.getElementById('skip-domain-input');
+    const raw = input.value.trim();
+    if (!raw) return;
+    try {
+      const r = await fetch('/api/skip-list', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domain: raw })
+      });
+      const data = await r.json();
+      input.value = '';
+      await loadSkipList();
+      const confirm = document.getElementById('skip-save-confirm');
+      confirm.textContent = `Saved — ${data.domain} will now be skipped automatically.`;
+      confirm.style.display = 'block';
+      setTimeout(() => { confirm.style.display = 'none'; }, 3000);
+    } catch (e) { console.error('Add domain failed', e); }
+  }
+
+  window.removeSkipDomain = async function(domain) {
+    try {
+      await fetch('/api/skip-list/' + encodeURIComponent(domain), { method: 'DELETE' });
+      await loadSkipList();
+      const confirm = document.getElementById('skip-save-confirm');
+      confirm.textContent = `Removed — ${domain} will no longer be skipped.`;
+      confirm.style.display = 'block';
+      setTimeout(() => { confirm.style.display = 'none'; }, 3000);
+    } catch (e) { console.error('Remove domain failed', e); }
+  };
+
+  // ---- Initial load + auto-refresh every 30s ----
+  refreshAll();
+  setInterval(refreshAll, 30000);
+</script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+{
+  "name": "oracle",
+  "version": "1.0.0",
+  "description": "ORACLE — Outreach Research Autonomous Campaign Learning Engine",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "apify-client": "^2.9.3",
+    "@supabase/supabase-js": "^2.39.0",
+    "node-cron": "^3.0.3",
+    "express": "^4.18.2",
+    "node-telegram-bot-api": "^0.64.0",
+    "winston": "^3.11.0",
+    "@anthropic-ai/sdk": "^0.20.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.1"
+  }
+}

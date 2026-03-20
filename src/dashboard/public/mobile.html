@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>ORACLE Mobile</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Raleway:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --void: #030308;
+      --surface: #0d0d2b;
+      --card: rgba(15, 15, 40, 0.9);
+      --card-border: rgba(100, 80, 255, 0.2);
+      --violet: #7c5cfc;
+      --violet-bright: #9d7eff;
+      --crystal: #b8a8ff;
+      --cyan: #00d4ff;
+      --gold: #f0c040;
+      --green: #00e896;
+      --green-dim: rgba(0, 232, 150, 0.12);
+      --red: #ff4466;
+      --red-dim: rgba(255, 68, 102, 0.12);
+      --amber: #ffaa00;
+      --text-primary: rgba(220, 210, 255, 0.95);
+      --text-secondary: rgba(160, 145, 210, 0.75);
+      --text-muted: rgba(100, 90, 150, 0.6);
+    }
+
+    body {
+      background: var(--void);
+      color: var(--text-primary);
+      font-family: 'Raleway', sans-serif;
+      min-height: 100vh;
+      padding: 0;
+    }
+
+    /* Gradient orb */
+    .bg-orb {
+      position: fixed;
+      width: 300px; height: 300px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(124,92,252,0.15), transparent 70%);
+      filter: blur(60px);
+      top: -80px; left: -80px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    #app { position: relative; z-index: 1; padding: 0 0 80px; }
+
+    /* Header */
+    header {
+      background: rgba(7,7,26,0.95);
+      border-bottom: 1px solid var(--card-border);
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(20px);
+    }
+    .header-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .mini-orb {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #b8a8ff, #7c5cfc 50%, #030308 100%);
+      box-shadow: 0 0 12px rgba(124,92,252,0.6);
+      animation: orbPulse 3s ease-in-out infinite;
+      flex-shrink: 0;
+    }
+    @keyframes orbPulse {
+      0%,100% { box-shadow: 0 0 12px rgba(124,92,252,0.6); }
+      50% { box-shadow: 0 0 20px rgba(124,92,252,0.9); }
+    }
+    h1 {
+      font-family: 'Cinzel', serif;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      background: linear-gradient(135deg, #b8a8ff, #9d7eff, #00d4ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .live-badge {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 10px;
+      color: var(--green);
+      font-weight: 600;
+      letter-spacing: 0.08em;
+    }
+    .live-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: livePulse 2s ease-in-out infinite;
+    }
+    @keyframes livePulse {
+      0%,100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* Sections */
+    .section { padding: 20px 16px 0; }
+    .section-title {
+      font-family: 'Cinzel', serif;
+      font-size: 10px;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+
+    /* KPI row */
+    .kpi-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+    .kpi-card {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 14px;
+      position: relative;
+      overflow: hidden;
+    }
+    .kpi-card::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 2px;
+      background: var(--accent, var(--violet));
+      opacity: 0.7;
+    }
+    .kpi-label {
+      font-size: 9px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    .kpi-value {
+      font-family: 'Cinzel', serif;
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--accent, var(--crystal));
+      line-height: 1;
+    }
+
+    /* Card */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+    .card-title {
+      font-family: 'Cinzel', serif;
+      font-size: 10px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+    }
+
+    /* Health dots */
+    .health-list { display: flex; flex-direction: column; gap: 8px; }
+    .health-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 10px;
+      background: rgba(255,255,255,0.03);
+      border-radius: 8px;
+    }
+    .health-left { display: flex; align-items: center; gap: 8px; }
+    .hdot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .hdot.ok { background: var(--green); box-shadow: 0 0 5px var(--green); }
+    .hdot.error { background: var(--red); box-shadow: 0 0 5px var(--red); }
+    .hdot.warn { background: var(--amber); box-shadow: 0 0 5px var(--amber); }
+    .hdot.pending { background: var(--text-muted); }
+    .health-name { font-size: 12px; color: var(--text-secondary); font-weight: 500; }
+    .health-sub { font-size: 10px; color: var(--text-muted); }
+
+    /* Pipeline */
+    .pipeline-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .chip {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 6px;
+      padding: 5px 9px;
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+    .chip strong { color: var(--crystal); font-family: 'JetBrains Mono', monospace; }
+
+    /* Experiments */
+    .exp-item {
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .exp-item:last-child { border-bottom: none; }
+    .exp-vid { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--violet-bright); margin-bottom: 3px; }
+    .exp-hyp { font-size: 12px; color: var(--text-secondary); line-height: 1.4; margin-bottom: 4px; }
+    .exp-meta { font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .badge-winner { background: rgba(240,192,64,0.12); color: var(--gold); border: 1px solid rgba(240,192,64,0.25); }
+    .badge-loser { background: var(--red-dim); color: var(--red); border: 1px solid rgba(255,68,102,0.25); }
+    .badge-inconclusive { background: rgba(100,90,150,0.15); color: var(--text-muted); border: 1px solid rgba(100,90,150,0.2); }
+    .badge-pending { background: rgba(0,212,255,0.1); color: var(--cyan); border: 1px solid rgba(0,212,255,0.2); }
+
+    /* Reply item */
+    .reply-item {
+      padding: 12px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 10px;
+      margin-bottom: 8px;
+    }
+    .reply-email { font-size: 12px; color: var(--crystal); font-weight: 500; margin-bottom: 4px; }
+    .reply-preview {
+      font-size: 11px;
+      color: var(--text-secondary);
+      border-left: 2px solid var(--violet);
+      padding-left: 8px;
+      margin-bottom: 8px;
+      font-style: italic;
+      line-height: 1.4;
+    }
+    .reply-draft {
+      font-size: 11px;
+      color: var(--green);
+      background: var(--green-dim);
+      border: 1px solid rgba(0,232,150,0.15);
+      border-radius: 6px;
+      padding: 8px 10px;
+      line-height: 1.4;
+    }
+
+    /* Empty state */
+    .empty {
+      text-align: center;
+      padding: 24px;
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+
+    /* Refresh bar */
+    .refresh-bar {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: rgba(7,7,26,0.97);
+      border-top: 1px solid var(--card-border);
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 100;
+      backdrop-filter: blur(10px);
+    }
+    .refresh-time { font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+    .refresh-btn {
+      background: rgba(124,92,252,0.15);
+      border: 1px solid rgba(124,92,252,0.3);
+      color: var(--violet-bright);
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 12px;
+      font-family: 'Raleway', sans-serif;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .desktop-link {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-decoration: none;
+      letter-spacing: 0.05em;
+    }
+    .desktop-link:hover { color: var(--violet-bright); }
+
+    .skeleton {
+      background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%);
+      background-size: 400% 100%;
+      animation: shimmer 1.8s ease-in-out infinite;
+      border-radius: 4px;
+    }
+    @keyframes shimmer {
+      0% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+  </style>
+</head>
+<body>
+<div class="bg-orb"></div>
+<div id="app">
+
+  <header>
+    <div class="header-brand">
+      <div class="mini-orb"></div>
+      <h1>ORACLE</h1>
+    </div>
+    <div class="live-badge">
+      <div class="live-dot"></div>
+      LIVE
+    </div>
+  </header>
+
+  <div class="section">
+    <div class="section-title">Mission Stats</div>
+    <div class="kpi-row">
+      <div class="kpi-card" style="--accent:var(--violet)">
+        <div class="kpi-label">Total Leads</div>
+        <div class="kpi-value" id="m-leads">—</div>
+      </div>
+      <div class="kpi-card" style="--accent:var(--cyan)">
+        <div class="kpi-label">Emails Sent</div>
+        <div class="kpi-value" id="m-sent">—</div>
+      </div>
+    </div>
+    <div class="kpi-row">
+      <div class="kpi-card" style="--accent:var(--gold)">
+        <div class="kpi-label">Open Rate</div>
+        <div class="kpi-value" id="m-open">—</div>
+      </div>
+      <div class="kpi-card" style="--accent:var(--green)">
+        <div class="kpi-label">Reply Rate</div>
+        <div class="kpi-value" id="m-reply">—</div>
+      </div>
+    </div>
+    <div class="kpi-row">
+      <div class="kpi-card" style="--accent:var(--violet-bright)">
+        <div class="kpi-label">Experiments</div>
+        <div class="kpi-value" id="m-exps">—</div>
+      </div>
+      <div class="kpi-card" style="--accent:var(--amber)">
+        <div class="kpi-label">Baseline</div>
+        <div class="kpi-value" id="m-baseline">—</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">System Health</div>
+    <div class="card">
+      <div class="health-list" id="m-health">
+        <div class="health-row"><div class="health-left"><div class="hdot pending"></div><div class="health-name">Loading...</div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Last Pipeline Run</div>
+    <div class="card" id="m-pipeline">
+      <div class="skeleton" style="height:12px;margin-bottom:8px"></div>
+      <div class="skeleton" style="height:12px;width:70%"></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Experiments</div>
+    <div class="card">
+      <div id="m-experiments">
+        <div class="skeleton" style="height:50px;margin-bottom:8px;border-radius:8px"></div>
+        <div class="skeleton" style="height:50px;border-radius:8px"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Reply Queue</div>
+    <div id="m-replies">
+      <div class="skeleton" style="height:70px;margin-bottom:8px;border-radius:10px"></div>
+    </div>
+  </div>
+
+  <div style="height:70px"></div>
+</div>
+
+<div class="refresh-bar">
+  <div>
+    <div class="refresh-time" id="m-refresh-time">Loading...</div>
+    <a href="/" class="desktop-link">Full dashboard</a>
+  </div>
+  <button class="refresh-btn" onclick="mRefresh()">
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline>
+      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+    </svg>
+    Refresh
+  </button>
+</div>
+
+<script>
+  function fmt(n) { if (n === null || n === undefined) return '—'; return typeof n === 'number' ? n.toLocaleString() : n; }
+  function fmtPct(v) { if (!v || v === '0.00') return '—'; return v + '%'; }
+  function timeAgo(ts) {
+    if (!ts) return 'never';
+    const m = Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
+    if (m < 1) return 'just now'; if (m < 60) return m+'m ago';
+    const h = Math.floor(m/60); if (h < 24) return h+'h ago';
+    return Math.floor(h/24)+'d ago';
+  }
+  function outcomeBadge(o) {
+    const map = {winner:'badge-winner',loser:'badge-loser',inconclusive:'badge-inconclusive',pending:'badge-pending'};
+    return o ? `<span class="badge ${map[o]||'badge-pending'}">${o}</span>` : '';
+  }
+
+  async function mRefresh() {
+    document.getElementById('m-refresh-time').textContent = 'Refreshing...';
+
+    try {
+      const ov = await fetch('/api/overview').then(r=>r.json());
+      document.getElementById('m-leads').textContent = fmt(ov.total_leads);
+      document.getElementById('m-sent').textContent = ov.total_emails_sent >= 1000
+        ? (ov.total_emails_sent/1000).toFixed(1)+'k' : fmt(ov.total_emails_sent);
+      document.getElementById('m-open').textContent = fmtPct(ov.open_rate);
+      document.getElementById('m-reply').textContent = fmtPct(ov.positive_reply_rate);
+      document.getElementById('m-exps').textContent = fmt(ov.active_experiments);
+      document.getElementById('m-baseline').textContent = ov.current_baseline ? ov.current_baseline+'%' : '—';
+    } catch(e) {}
+
+    try {
+      const health = await fetch('/api/health').then(r=>r.json());
+      const items = [
+        ['Supabase', health.supabase], ['Instantly', health.instantly],
+        ['Anthropic', health.anthropic], ['Grok', health.grok],
+        ['Apify', health.apify], ['Telegram', health.telegram]
+      ];
+      document.getElementById('m-health').innerHTML = items.map(([name, d]) => {
+        const st = d?.status || 'unknown';
+        const cls = (st==='connected'||st==='configured') ? 'ok' : (st==='error'||st==='missing') ? 'error' : 'pending';
+        return `<div class="health-row"><div class="health-left"><div class="hdot ${cls}"></div><div><div class="health-name">${name}</div></div></div><div class="health-sub">${st}</div></div>`;
+      }).join('');
+    } catch(e) {}
+
+    try {
+      const pipe = await fetch('/api/pipeline').then(r=>r.json());
+      const el = document.getElementById('m-pipeline');
+      if (!pipe || !pipe.id) { el.innerHTML = '<div class="empty">No pipeline runs yet</div>'; }
+      else {
+        el.innerHTML = `
+          <div class="card-title" style="margin-bottom:8px">${pipe.status || '—'} &middot; ${timeAgo(pipe.started_at)} &middot; ${pipe.variant_id||'—'}</div>
+          <div class="pipeline-chips">
+            <div class="chip">Scraped <strong>${fmt(pipe.scraped_count)}</strong></div>
+            <div class="chip">Enriched <strong>${fmt(pipe.enriched_count)}</strong></div>
+            <div class="chip">Verified <strong>${fmt(pipe.verified_count)}</strong></div>
+            <div class="chip">Launched <strong>${fmt(pipe.added_to_campaign)}</strong></div>
+          </div>`;
+      }
+    } catch(e) {}
+
+    try {
+      const exps = await fetch('/api/experiments').then(r=>r.json());
+      const el = document.getElementById('m-experiments');
+      if (!exps.length) { el.innerHTML = '<div class="empty">No experiments yet</div>'; }
+      else {
+        el.innerHTML = exps.slice(0,5).map(e => `
+          <div class="exp-item">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+              <div>
+                <div class="exp-vid">${e.variant_id}</div>
+                <div class="exp-hyp">${(e.hypothesis||e.what_changed||'').slice(0,100)}</div>
+                <div class="exp-meta">${fmt(e.sends||0)} sends &middot; ${timeAgo(e.launched_at)}</div>
+              </div>
+              <div>${outcomeBadge(e.outcome)}</div>
+            </div>
+          </div>`).join('');
+      }
+    } catch(e) {}
+
+    try {
+      const replies = await fetch('/api/reply-queue').then(r=>r.json());
+      const el = document.getElementById('m-replies');
+      if (!replies.length) { el.innerHTML = '<div class="empty">No pending replies</div>'; }
+      else {
+        el.innerHTML = replies.slice(0,3).map(rep => `
+          <div class="reply-item">
+            <div class="reply-email">${rep.lead_email||'—'} &middot; ${rep.company_name||''}</div>
+            ${rep.inbound_message ? `<div class="reply-preview">${rep.inbound_message.slice(0,120)}</div>` : ''}
+            ${rep.oracle_draft ? `<div class="reply-draft">${rep.oracle_draft.slice(0,150)}</div>` : ''}
+          </div>`).join('');
+      }
+    } catch(e) {}
+
+    document.getElementById('m-refresh-time').textContent = 'Refreshed ' + new Date().toLocaleTimeString();
+  }
+
+  mRefresh();
+  setInterval(mRefresh, 30000);
+</script>
+</body>
+</html>
