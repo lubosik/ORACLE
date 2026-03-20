@@ -8,6 +8,10 @@ import { sendTelegramWithButtons } from '../telegram/bot.js';
 import { getOverviewAnalytics, getCampaignAnalytics, getCampaignStepAnalytics } from '../analytics/tracker.js';
 import { getEngineState, setEngineState } from '../utils/engine-state.js';
 import { getSkipList, addDomain, removeDomain } from '../utils/skip-list.js';
+import { activitySSEHandler } from '../utils/activity.js';
+import { getSetting, setSetting } from '../utils/settings.js';
+import { logActivity } from '../utils/activity.js';
+import { launchApprovedCampaign } from '../pipeline/launch_approved.js';
 import logger from '../utils/logger.js';
 import 'dotenv/config';
 
@@ -201,31 +205,6 @@ app.get('/api/reply-queue', async (req, res) => {
   }
 });
 
-// Campaign actions
-app.post('/api/campaigns/:id/pause', async (req, res) => {
-  try {
-    const r = await fetch(`${process.env.INSTANTLY_BASE_URL}/campaigns/${req.params.id}/pause`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${process.env.INSTANTLY_API_KEY}` }
-    });
-    res.json(await r.json());
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/campaigns/:id/activate', async (req, res) => {
-  try {
-    const r = await fetch(`${process.env.INSTANTLY_BASE_URL}/campaigns/${req.params.id}/activate`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${process.env.INSTANTLY_API_KEY}` }
-    });
-    res.json(await r.json());
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 // Instantly reply webhook receiver
 app.post('/webhook/reply', async (req, res) => {
   res.sendStatus(200);
@@ -350,6 +329,186 @@ app.delete('/api/skip-list/:domain', (req, res) => {
 // Mobile view
 app.get('/mobile', (req, res) => {
   res.sendFile(join(__dirname, 'public/mobile.html'));
+});
+
+// ---- NEW: Activity feed ----
+app.get('/api/activity/stream', activitySSEHandler);
+
+app.get('/api/activity', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 100;
+    const { data } = await supabase
+      .from('activity_feed')
+      .select('*')
+      .order('timestamp', { ascending: false })
+      .limit(limit);
+    res.json(data || []);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---- NEW: System settings ----
+app.get('/api/settings', async (req, res) => {
+  try {
+    const { data } = await supabase.from('system_settings').select('*');
+    res.json(Object.fromEntries((data || []).map(r => [r.key, r.value])));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/settings', async (req, res) => {
+  try {
+    const { key, value } = req.body;
+    if (!key) return res.status(400).json({ error: 'key is required' });
+    await setSetting(key, value);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---- NEW: Global on/off toggle (Supabase-backed) ----
+app.post('/api/oracle/toggle', async (req, res) => {
+  try {
+    const { enabled } = req.body;
+    if (typeof enabled !== 'boolean') return res.status(400).json({ error: 'enabled must be boolean' });
+    await setSetting('oracle_enabled', enabled ? 'true' : 'false');
+    await logActivity({
+      category: 'system',
+      level: enabled ? 'success' : 'warning',
+      message: `ORACLE ${enabled ? 'ENABLED' : 'DISABLED'} via dashboard`
+    });
+    res.json({ oracle_enabled: enabled });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---- NEW: Inbox registry ----
+app.get('/api/inboxes', async (req, res) => {
+  try {
+    const { data } = await supabase
+      .from('inbox_registry_status')
+      .select('*')
+      .order('days_warmed', { ascending: false });
+    res.json(data || []);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---- NEW: Campaign drafts ----
+app.get('/api/drafts', async (req, res) => {
+  try {
+    const { data } = await supabase
+      .from('campaign_drafts')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(20);
+    res.json(data || []);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Approve draft from dashboard
+app.post('/api/drafts/:id/approve', async (req, res) => {
+  try {
+    const { data: draft } = await supabase
+      .from('campaign_drafts')
+      .select('*')
+      .eq('id', req.params.id)
+      .eq('status', 'pending')
+      .single();
+
+    if (!draft) return res.status(404).json({ error: 'Draft not found or already actioned' });
+
+    await supabase
+      .from('campaign_drafts')
+      .update({ status: 'approved', actioned_at: new Date().toISOString(), actioned_by: 'dashboard' })
+      .eq('id', req.params.id);
+
+    await logActivity({
+      category: 'approval',
+      level: 'success',
+      message: `Campaign approved via dashboard — pushing to Instantly`,
+      detail: { draft_id: req.params.id }
+    });
+
+    // Launch async so we can respond immediately
+    launchApprovedCampaign(draft).catch(err => {
+      logger.error('Dashboard-triggered launch failed', { error: err.message });
+    });
+
+    res.json({ ok: true, status: 'approved' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Reject draft from dashboard
+app.post('/api/drafts/:id/reject', async (req, res) => {
+  try {
+    await supabase
+      .from('campaign_drafts')
+      .update({ status: 'rejected', actioned_at: new Date().toISOString(), actioned_by: 'dashboard' })
+      .eq('id', req.params.id);
+
+    await logActivity({
+      category: 'approval',
+      level: 'warning',
+      message: `Campaign rejected via dashboard — draft discarded`,
+      detail: { draft_id: req.params.id }
+    });
+
+    res.json({ ok: true, status: 'rejected' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---- Campaign controls (pause/activate/delete) — log activity ----
+app.post('/api/campaigns/:id/pause', async (req, res) => {
+  try {
+    const r = await fetch(`${process.env.INSTANTLY_BASE_URL}/campaigns/${req.params.id}/pause`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${process.env.INSTANTLY_API_KEY}` }
+    });
+    const result = await r.json();
+    await logActivity({ category: 'campaign', level: 'warning', message: `Campaign paused from dashboard — ID: ${req.params.id}`, campaign_id: req.params.id });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/campaigns/:id/activate', async (req, res) => {
+  try {
+    const r = await fetch(`${process.env.INSTANTLY_BASE_URL}/campaigns/${req.params.id}/activate`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${process.env.INSTANTLY_API_KEY}` }
+    });
+    const result = await r.json();
+    await logActivity({ category: 'campaign', level: 'success', message: `Campaign activated from dashboard — ID: ${req.params.id}`, campaign_id: req.params.id });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/campaigns/:id', async (req, res) => {
+  try {
+    const r = await fetch(`${process.env.INSTANTLY_BASE_URL}/campaigns/${req.params.id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${process.env.INSTANTLY_API_KEY}` }
+    });
+    await logActivity({ category: 'campaign', level: 'warning', message: `Campaign deleted from dashboard — ID: ${req.params.id}`, campaign_id: req.params.id });
+    res.json({ deleted: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 export function startDashboard() {

@@ -1,5 +1,7 @@
 import { supabase } from '../utils/supabase.js';
 import { getPendingEdits } from './bot.js';
+import { logActivity } from '../utils/activity.js';
+import { launchApprovedCampaign } from '../pipeline/launch_approved.js';
 import logger from '../utils/logger.js';
 import 'dotenv/config';
 
@@ -32,6 +34,70 @@ export async function handleCallback(query, bot) {
 
   await bot.answerCallbackQuery(query.id);
 
+  // --- Campaign approval callbacks ---
+  if (callbackData.startsWith('approvecampaign_')) {
+    const draftId = callbackData.replace('approvecampaign_', '');
+
+    const { data: draft } = await supabase
+      .from('campaign_drafts')
+      .select('*')
+      .eq('id', draftId)
+      .eq('status', 'pending')
+      .single();
+
+    if (!draft) {
+      await bot.sendMessage(chatId, 'Campaign draft not found or already actioned.');
+      return;
+    }
+
+    await supabase
+      .from('campaign_drafts')
+      .update({ status: 'approved', actioned_at: new Date().toISOString() })
+      .eq('id', draftId);
+
+    await bot.editMessageText(
+      `ORACLE — CAMPAIGN APPROVED\n${draft.campaign_name}\n${draft.lead_count} leads\nPushing to Instantly now...`,
+      { chat_id: message.chat.id, message_id: message.message_id }
+    );
+
+    await logActivity({
+      category: 'approval',
+      level: 'success',
+      message: `Campaign approved via Telegram — pushing to Instantly`,
+      detail: { draft_id: draftId }
+    });
+
+    try {
+      await launchApprovedCampaign(draft);
+    } catch (err) {
+      await bot.sendMessage(chatId, `Campaign launch failed: ${err.message}\n\nCheck Railway logs for details.`);
+    }
+    return;
+  }
+
+  if (callbackData.startsWith('rejectcampaign_')) {
+    const draftId = callbackData.replace('rejectcampaign_', '');
+
+    await supabase
+      .from('campaign_drafts')
+      .update({ status: 'rejected', actioned_at: new Date().toISOString() })
+      .eq('id', draftId);
+
+    await bot.editMessageText(
+      `ORACLE — CAMPAIGN REJECTED\nDraft discarded. No emails were sent.`,
+      { chat_id: message.chat.id, message_id: message.message_id }
+    );
+
+    await logActivity({
+      category: 'approval',
+      level: 'warning',
+      message: `Campaign rejected via Telegram — draft discarded`,
+      detail: { draft_id: draftId }
+    });
+    return;
+  }
+
+  // --- Reply log callbacks (existing) ---
   const [action, replyId] = callbackData.split('_').reduce((acc, part, i) => {
     if (i === 0) acc[0] = part;
     else acc[1] = (acc[1] ? acc[1] + '_' : '') + part;

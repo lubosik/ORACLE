@@ -1218,7 +1218,203 @@
     </div>
   </div>
 
+  <!-- SECTION: CONTROLS -->
+  <div class="section-full" id="controls-section">
+    <div class="section-heading">
+      <h2>Controls</h2>
+      <div class="section-line"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:20px;">
+
+      <!-- Oracle Toggle (Supabase-backed) -->
+      <div class="card" style="padding:24px;">
+        <div class="card-title" style="margin-bottom:16px;">Global Switch</div>
+        <div id="oracle-supabase-toggle" onclick="toggleOracleSupabase()" style="
+          display:inline-flex;align-items:center;gap:10px;
+          background:rgba(255,68,102,0.08);border:1px solid rgba(255,68,102,0.35);
+          border-radius:28px;padding:7px 16px 7px 10px;cursor:pointer;
+          transition:all 0.35s ease;user-select:none;
+        ">
+          <div id="oracle-supa-track" style="
+            width:36px;height:20px;border-radius:10px;
+            background:rgba(255,68,102,0.35);position:relative;transition:background 0.35s;flex-shrink:0;
+          ">
+            <div id="oracle-supa-thumb" style="
+              width:14px;height:14px;border-radius:50%;background:var(--red);
+              position:absolute;top:3px;left:3px;
+              transition:transform 0.3s,background 0.35s;
+              box-shadow:0 0 6px rgba(255,68,102,0.6);
+            "></div>
+          </div>
+          <span id="oracle-supa-label" style="font-size:11px;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:var(--red);font-family:var(--font-display);white-space:nowrap;">ORACLE OFF</span>
+        </div>
+        <div style="margin-top:10px;font-size:11px;color:var(--text-muted);">Toggle updates Supabase system_settings in real time.</div>
+      </div>
+
+      <!-- Campaign Size Limits -->
+      <div class="card" style="padding:24px;">
+        <div class="card-title" style="margin-bottom:16px;">Campaign Size Limits</div>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <label style="font-size:12px;color:var(--text-secondary);">
+            Min leads per campaign
+            <input id="ctrl-min-leads" type="number" min="1" style="
+              display:block;margin-top:6px;width:100%;
+              background:rgba(255,255,255,0.05);border:1px solid var(--card-border);
+              border-radius:6px;padding:7px 10px;color:var(--text-primary);
+              font-family:var(--font-mono);font-size:13px;outline:none;
+            ">
+          </label>
+          <label style="font-size:12px;color:var(--text-secondary);">
+            Max leads per campaign
+            <input id="ctrl-max-leads" type="number" min="1" style="
+              display:block;margin-top:6px;width:100%;
+              background:rgba(255,255,255,0.05);border:1px solid var(--card-border);
+              border-radius:6px;padding:7px 10px;color:var(--text-primary);
+              font-family:var(--font-mono);font-size:13px;outline:none;
+            ">
+          </label>
+          <button onclick="saveLeadLimits()" style="
+            background:rgba(124,92,252,0.15);border:1px solid rgba(124,92,252,0.35);
+            color:var(--violet-bright);border-radius:8px;padding:8px 16px;
+            font-size:12px;cursor:pointer;font-family:var(--font-body);font-weight:500;
+            transition:all 0.2s;margin-top:4px;
+          ">Save Limits</button>
+          <div id="ctrl-limits-confirm" style="display:none;font-size:11px;color:var(--green);font-family:var(--font-mono);"></div>
+        </div>
+      </div>
+
+      <!-- Inbox Settings -->
+      <div class="card" style="padding:24px;">
+        <div class="card-title" style="margin-bottom:16px;">Inbox Settings</div>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <label style="font-size:12px;color:var(--text-secondary);display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input id="ctrl-require-warm" type="checkbox" style="width:14px;height:14px;cursor:pointer;">
+            Require warm inboxes only
+          </label>
+          <label style="font-size:12px;color:var(--text-secondary);">
+            Inboxes per campaign
+            <input id="ctrl-inboxes-count" type="number" min="1" max="10" style="
+              display:block;margin-top:6px;width:100%;
+              background:rgba(255,255,255,0.05);border:1px solid var(--card-border);
+              border-radius:6px;padding:7px 10px;color:var(--text-primary);
+              font-family:var(--font-mono);font-size:13px;outline:none;
+            ">
+          </label>
+          <button onclick="saveInboxSettings()" style="
+            background:rgba(124,92,252,0.15);border:1px solid rgba(124,92,252,0.35);
+            color:var(--violet-bright);border-radius:8px;padding:8px 16px;
+            font-size:12px;cursor:pointer;font-family:var(--font-body);font-weight:500;
+            transition:all 0.2s;margin-top:4px;
+          ">Save Inbox Settings</button>
+          <div id="ctrl-inbox-confirm" style="display:none;font-size:11px;color:var(--green);font-family:var(--font-mono);"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Inbox Status Table -->
+    <div class="card" style="margin-top:20px;padding:24px;">
+      <div class="card-header">
+        <div class="card-title">Inbox Warming Status</div>
+        <div id="inbox-warm-count" class="card-badge">—</div>
+      </div>
+      <div id="inbox-table-wrap" style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead>
+            <tr style="color:var(--text-muted);text-align:left;border-bottom:1px solid var(--card-border);">
+              <th style="padding:8px 12px;">Email</th>
+              <th style="padding:8px 12px;">Days Warmed</th>
+              <th style="padding:8px 12px;">Status</th>
+              <th style="padding:8px 12px;">Last Used</th>
+            </tr>
+          </thead>
+          <tbody id="inbox-tbody">
+            <tr><td colspan="4"><div class="skeleton" style="height:32px;margin:8px 0;"></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION: CAMPAIGN DRAFTS -->
+  <div class="section-full" id="drafts-section">
+    <div class="section-heading">
+      <h2>Campaign Drafts</h2>
+      <div class="section-line"></div>
+      <div id="drafts-badge" class="card-badge" style="white-space:nowrap;">—</div>
+    </div>
+    <div id="drafts-list">
+      <div class="empty-state"><div class="empty-icon">📋</div>No campaign drafts yet</div>
+    </div>
+  </div>
+
+  <!-- SECTION: LIVE ACTIVITY FEED -->
+  <div class="section-full" id="activity-section">
+    <div class="section-heading">
+      <h2>Live Activity</h2>
+      <div class="section-line"></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;" id="activity-filters">
+        <button class="activity-filter active" data-filter="all" onclick="setActivityFilter('all')">All</button>
+        <button class="activity-filter" data-filter="pipeline" onclick="setActivityFilter('pipeline')">Pipeline</button>
+        <button class="activity-filter" data-filter="error" onclick="setActivityFilter('error')">Errors</button>
+        <button class="activity-filter" data-filter="campaign" onclick="setActivityFilter('campaign')">Campaigns</button>
+        <button class="activity-filter" data-filter="inbox" onclick="setActivityFilter('inbox')">Inbox</button>
+        <button class="activity-filter" data-filter="approval" onclick="setActivityFilter('approval')">Approval</button>
+      </div>
+    </div>
+    <div class="card" style="padding:0;">
+      <div style="padding:12px 16px;border-bottom:1px solid var(--card-border);display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:11px;color:var(--text-muted);font-family:var(--font-mono);">Auto-updates via SSE. No manual refresh needed.</span>
+        <div id="sse-status" style="font-size:10px;font-family:var(--font-mono);color:var(--amber);">connecting...</div>
+      </div>
+      <div id="activity-feed" style="max-height:480px;overflow-y:auto;padding:8px 0;">
+        <div class="empty-state"><div class="empty-icon">📡</div>Waiting for activity...</div>
+      </div>
+    </div>
+  </div>
+
 </div>
+
+<style>
+/* Activity feed styles */
+.activity-filter {
+  background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);
+  color:var(--text-muted);border-radius:6px;padding:4px 10px;
+  font-size:11px;cursor:pointer;font-family:var(--font-body);font-weight:500;
+  transition:all 0.2s;letter-spacing:0.05em;
+}
+.activity-filter:hover { border-color:var(--violet-dim); color:var(--text-secondary); }
+.activity-filter.active { background:rgba(124,92,252,0.15);border-color:rgba(124,92,252,0.4);color:var(--violet-bright); }
+.activity-row {
+  display:flex;align-items:flex-start;gap:10px;
+  padding:8px 16px;border-bottom:1px solid rgba(255,255,255,0.03);
+  font-size:12px;transition:background 0.15s;
+}
+.activity-row:hover { background:rgba(255,255,255,0.02); }
+.activity-row.level-error { border-left:2px solid var(--red); }
+.activity-row.level-warning { border-left:2px solid var(--amber); }
+.activity-row.level-success { border-left:2px solid var(--green); }
+.activity-row.level-info { border-left:2px solid rgba(255,255,255,0.1); }
+.activity-ts { font-family:var(--font-mono);font-size:10px;color:var(--text-muted);white-space:nowrap;min-width:70px;padding-top:1px; }
+.activity-cat { font-family:var(--font-mono);font-size:10px;padding:2px 6px;border-radius:4px;white-space:nowrap;
+  background:rgba(124,92,252,0.1);color:var(--violet-bright);border:1px solid rgba(124,92,252,0.2); }
+.activity-msg { flex:1;color:var(--text-primary);line-height:1.4; }
+.inbox-warm-pill { display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;font-family:var(--font-mono); }
+.inbox-warm-pill.warm { background:rgba(0,232,150,0.15);color:var(--green);border:1px solid rgba(0,232,150,0.25); }
+.inbox-warm-pill.warming { background:rgba(255,170,0,0.12);color:var(--amber);border:1px solid rgba(255,170,0,0.25); }
+.inbox-warm-pill.inactive { background:rgba(255,255,255,0.04);color:var(--text-muted);border:1px solid rgba(255,255,255,0.08); }
+.draft-card { background:rgba(124,92,252,0.04);border:1px solid var(--card-border);border-radius:12px;padding:20px;margin-bottom:14px; }
+.draft-card.pending { border-color:rgba(240,192,64,0.3); }
+.draft-card.approved { border-color:rgba(0,232,150,0.25); }
+.draft-card.rejected { border-color:rgba(255,68,102,0.2);opacity:0.6; }
+.draft-card.expired { opacity:0.45; }
+.draft-actions { display:flex;gap:8px;margin-top:14px; }
+.draft-btn { padding:6px 14px;border-radius:8px;font-size:12px;cursor:pointer;font-family:var(--font-body);font-weight:500;transition:all 0.2s;border:1px solid; }
+.draft-btn.approve { background:rgba(0,232,150,0.1);border-color:rgba(0,232,150,0.3);color:var(--green); }
+.draft-btn.approve:hover { background:rgba(0,232,150,0.2); }
+.draft-btn.reject { background:rgba(255,68,102,0.08);border-color:rgba(255,68,102,0.25);color:var(--red); }
+.draft-btn.reject:hover { background:rgba(255,68,102,0.15); }
+</style>
 
 <script>
   // ---- Starfield ----
@@ -1676,6 +1872,292 @@
   // ---- Initial load + auto-refresh every 30s ----
   refreshAll();
   setInterval(refreshAll, 30000);
+
+  // ============================================================
+  // CONTROLS
+  // ============================================================
+  let _oracleSupabaseEnabled = false;
+
+  function applyOracleSupabaseUI(enabled) {
+    _oracleSupabaseEnabled = enabled;
+    const wrap = document.getElementById('oracle-supabase-toggle');
+    const track = document.getElementById('oracle-supa-track');
+    const thumb = document.getElementById('oracle-supa-thumb');
+    const label = document.getElementById('oracle-supa-label');
+    if (enabled) {
+      wrap.style.background = 'rgba(0,232,150,0.08)';
+      wrap.style.borderColor = 'rgba(0,232,150,0.35)';
+      track.style.background = 'rgba(0,232,150,0.5)';
+      thumb.style.transform = 'translateX(16px)';
+      thumb.style.background = 'var(--green)';
+      thumb.style.boxShadow = '0 0 6px rgba(0,232,150,0.7)';
+      label.textContent = 'ORACLE ON';
+      label.style.color = 'var(--green)';
+    } else {
+      wrap.style.background = 'rgba(255,68,102,0.08)';
+      wrap.style.borderColor = 'rgba(255,68,102,0.35)';
+      track.style.background = 'rgba(255,68,102,0.35)';
+      thumb.style.transform = '';
+      thumb.style.background = 'var(--red)';
+      thumb.style.boxShadow = '0 0 6px rgba(255,68,102,0.6)';
+      label.textContent = 'ORACLE OFF';
+      label.style.color = 'var(--red)';
+    }
+  }
+
+  async function toggleOracleSupabase() {
+    try {
+      const r = await fetch('/api/oracle/toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: !_oracleSupabaseEnabled })
+      });
+      const d = await r.json();
+      applyOracleSupabaseUI(d.oracle_enabled === true);
+    } catch(e) { console.error('Oracle toggle failed', e); }
+  }
+
+  async function loadSettings() {
+    try {
+      const r = await fetch('/api/settings');
+      const s = await r.json();
+      document.getElementById('ctrl-min-leads').value = s.min_leads_per_campaign || 50;
+      document.getElementById('ctrl-max-leads').value = s.max_leads_per_campaign || 200;
+      document.getElementById('ctrl-require-warm').checked = s.require_warm_inboxes_only !== 'false';
+      document.getElementById('ctrl-inboxes-count').value = s.inboxes_per_campaign || 3;
+      applyOracleSupabaseUI(s.oracle_enabled === 'true');
+    } catch(e) { console.error('Load settings failed', e); }
+  }
+
+  async function saveLeadLimits() {
+    const min = document.getElementById('ctrl-min-leads').value;
+    const max = document.getElementById('ctrl-max-leads').value;
+    try {
+      await fetch('/api/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ key: 'min_leads_per_campaign', value: min }) });
+      await fetch('/api/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ key: 'max_leads_per_campaign', value: max }) });
+      const c = document.getElementById('ctrl-limits-confirm');
+      c.textContent = 'Saved.';
+      c.style.display = 'block';
+      setTimeout(() => c.style.display = 'none', 3000);
+    } catch(e) { console.error('Save limits failed', e); }
+  }
+
+  async function saveInboxSettings() {
+    const warm = document.getElementById('ctrl-require-warm').checked;
+    const count = document.getElementById('ctrl-inboxes-count').value;
+    try {
+      await fetch('/api/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ key: 'require_warm_inboxes_only', value: warm ? 'true' : 'false' }) });
+      await fetch('/api/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ key: 'inboxes_per_campaign', value: count }) });
+      const c = document.getElementById('ctrl-inbox-confirm');
+      c.textContent = 'Saved.';
+      c.style.display = 'block';
+      setTimeout(() => c.style.display = 'none', 3000);
+    } catch(e) { console.error('Save inbox settings failed', e); }
+  }
+
+  async function loadInboxes() {
+    try {
+      const r = await fetch('/api/inboxes');
+      const inboxes = await r.json();
+      const warmCount = inboxes.filter(i => i.is_warm && i.is_active).length;
+      document.getElementById('inbox-warm-count').textContent = `${warmCount} warm / ${inboxes.length} total`;
+      const tbody = document.getElementById('inbox-tbody');
+      if (!inboxes.length) {
+        tbody.innerHTML = '<tr><td colspan="4"><div class="empty-state">No inboxes registered</div></td></tr>';
+        return;
+      }
+      tbody.innerHTML = inboxes.map(i => {
+        let pill, statusText;
+        if (!i.is_active) {
+          pill = 'inactive'; statusText = 'Inactive';
+        } else if (i.is_warm) {
+          pill = 'warm'; statusText = 'WARM';
+        } else {
+          const daysLeft = Math.max(0, (i.warming_days_target || 21) - (i.days_warmed || 0));
+          pill = 'warming'; statusText = `${daysLeft}d left`;
+        }
+        const lastUsed = i.last_used_at ? new Date(i.last_used_at).toLocaleDateString() : 'Never';
+        return `<tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+          <td style="padding:10px 12px;font-family:var(--font-mono);font-size:11px;color:var(--text-primary);">${i.email}</td>
+          <td style="padding:10px 12px;font-family:var(--font-mono);font-size:11px;color:var(--text-secondary);">${i.days_warmed || 0} / ${i.warming_days_target || 21}</td>
+          <td style="padding:10px 12px;"><span class="inbox-warm-pill ${pill}">${statusText}</span></td>
+          <td style="padding:10px 12px;font-size:11px;color:var(--text-muted);">${lastUsed}</td>
+        </tr>`;
+      }).join('');
+    } catch(e) {
+      document.getElementById('inbox-tbody').innerHTML = '<tr><td colspan="4" style="color:var(--red);font-size:12px;padding:12px;">Failed to load inboxes</td></tr>';
+    }
+  }
+
+  // ============================================================
+  // DRAFTS
+  // ============================================================
+  async function loadDrafts() {
+    try {
+      const r = await fetch('/api/drafts');
+      const drafts = await r.json();
+      const pending = drafts.filter(d => d.status === 'pending').length;
+      const approved = drafts.filter(d => d.status === 'approved').length;
+      const rejected = drafts.filter(d => d.status === 'rejected' || d.status === 'expired').length;
+      document.getElementById('drafts-badge').textContent = `Pending: ${pending}  Approved: ${approved}  Rejected/Expired: ${rejected}`;
+
+      const el = document.getElementById('drafts-list');
+      if (!drafts.length) {
+        el.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div>No campaign drafts yet</div>';
+        return;
+      }
+      el.innerHTML = drafts.map(d => {
+        const inboxes = Array.isArray(d.selected_inboxes) ? d.selected_inboxes.join(', ') : d.selected_inboxes;
+        const created = d.created_at ? new Date(d.created_at).toLocaleString() : '—';
+        const actioned = d.actioned_at ? new Date(d.actioned_at).toLocaleString() : null;
+        const statusBadgeHtml = d.status === 'pending'
+          ? `<span style="color:var(--gold);font-family:var(--font-mono);font-size:10px;background:var(--gold-dim);padding:2px 8px;border-radius:4px;">PENDING</span>`
+          : d.status === 'approved'
+          ? `<span style="color:var(--green);font-family:var(--font-mono);font-size:10px;background:var(--green-dim);padding:2px 8px;border-radius:4px;">APPROVED</span>`
+          : `<span style="color:var(--red);font-family:var(--font-mono);font-size:10px;background:var(--red-dim);padding:2px 8px;border-radius:4px;">${d.status.toUpperCase()}</span>`;
+        const actions = d.status === 'pending' ? `
+          <div class="draft-actions">
+            <button class="draft-btn approve" onclick="approveDraft('${d.id}')">Approve Campaign</button>
+            <button class="draft-btn reject" onclick="rejectDraft('${d.id}')">Reject</button>
+          </div>` : actioned ? `<div style="margin-top:10px;font-size:11px;color:var(--text-muted);">Actioned: ${actioned} by ${d.actioned_by || 'telegram'}</div>` : '';
+        return `<div class="draft-card ${d.status}">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">
+            <div>
+              <div style="font-family:var(--font-display);font-size:14px;color:var(--crystal);letter-spacing:0.05em;">${d.campaign_name}</div>
+              <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">${d.lead_count} leads &middot; ${d.variant_id || 'v1_baseline'} &middot; Created ${created}</div>
+            </div>
+            ${statusBadgeHtml}
+          </div>
+          <div style="margin-top:10px;font-size:12px;color:var(--text-secondary);">
+            <span style="color:var(--text-muted);">Inboxes:</span> <span style="font-family:var(--font-mono);font-size:11px;">${inboxes}</span>
+          </div>
+          ${actions}
+        </div>`;
+      }).join('');
+    } catch(e) {
+      document.getElementById('drafts-list').innerHTML = '<div class="empty-state" style="color:var(--red);">Failed to load drafts</div>';
+    }
+  }
+
+  window.approveDraft = async function(id) {
+    if (!confirm('Approve this campaign and push to Instantly?')) return;
+    try {
+      const r = await fetch(`/api/drafts/${id}/approve`, { method: 'POST' });
+      const d = await r.json();
+      if (d.ok) { await loadDrafts(); }
+      else alert('Approval failed: ' + (d.error || 'unknown'));
+    } catch(e) { alert('Error: ' + e.message); }
+  };
+
+  window.rejectDraft = async function(id) {
+    if (!confirm('Reject and discard this campaign draft?')) return;
+    try {
+      await fetch(`/api/drafts/${id}/reject`, { method: 'POST' });
+      await loadDrafts();
+    } catch(e) { alert('Error: ' + e.message); }
+  };
+
+  // ============================================================
+  // LIVE ACTIVITY FEED
+  // ============================================================
+  let _activityFilter = 'all';
+  let _activityEntries = [];
+
+  function setActivityFilter(filter) {
+    _activityFilter = filter;
+    document.querySelectorAll('.activity-filter').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.filter === filter);
+    });
+    renderActivityFeed();
+  }
+
+  const CAT_LABELS = {
+    pipeline: 'PIPELINE', scraping: 'SCRAPING', enrichment: 'ENRICH',
+    verification: 'VERIFY', copy: 'COPY', draft: 'DRAFT',
+    approval: 'APPROVAL', campaign: 'CAMPAIGN', experiment: 'EXPERIMENT',
+    analytics: 'ANALYTICS', inbox: 'INBOX', error: 'ERROR', system: 'SYSTEM'
+  };
+
+  const LEVEL_ICONS = { success: '✓', info: '·', warning: '!', error: '✕' };
+  const LEVEL_COLORS = { success: 'var(--green)', info: 'var(--text-muted)', warning: 'var(--amber)', error: 'var(--red)' };
+
+  function renderActivityFeed() {
+    const el = document.getElementById('activity-feed');
+    let entries = _activityEntries;
+    if (_activityFilter !== 'all') {
+      entries = entries.filter(e => e.category === _activityFilter || (_activityFilter === 'error' && e.level === 'error'));
+    }
+    if (!entries.length) {
+      el.innerHTML = '<div class="empty-state"><div class="empty-icon">📡</div>No activity yet</div>';
+      return;
+    }
+    el.innerHTML = entries.slice(0, 200).map(e => {
+      const ts = new Date(e.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const icon = LEVEL_ICONS[e.level] || '·';
+      const iconColor = LEVEL_COLORS[e.level] || 'var(--text-muted)';
+      const catLabel = CAT_LABELS[e.category] || e.category.toUpperCase();
+      return `<div class="activity-row level-${e.level}">
+        <span class="activity-ts">${ts}</span>
+        <span class="activity-cat">${catLabel}</span>
+        <span style="color:${iconColor};font-family:var(--font-mono);font-size:11px;min-width:12px;">${icon}</span>
+        <span class="activity-msg">${e.message}</span>
+      </div>`;
+    }).join('');
+  }
+
+  function initActivitySSE() {
+    const statusEl = document.getElementById('sse-status');
+    const evtSource = new EventSource('/api/activity/stream');
+
+    evtSource.onopen = () => {
+      if (statusEl) { statusEl.textContent = 'LIVE'; statusEl.style.color = 'var(--green)'; }
+    };
+
+    evtSource.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'history') {
+        _activityEntries = data.entries;
+      } else {
+        // Single new entry — prepend
+        _activityEntries.unshift(data);
+        if (_activityEntries.length > 500) _activityEntries.pop();
+      }
+      renderActivityFeed();
+    };
+
+    evtSource.onerror = () => {
+      if (statusEl) { statusEl.textContent = 'reconnecting...'; statusEl.style.color = 'var(--amber)'; }
+    };
+  }
+
+  // ---- Extend refreshAll to include new sections ----
+  const _origRefreshAll = refreshAll;
+  refreshAll = async function() {
+    const btn = document.getElementById('refresh-btn');
+    if (btn) btn.classList.add('spinning');
+    document.getElementById('last-refresh-time').textContent = 'Refreshing...';
+
+    await Promise.allSettled([
+      loadEngineState(),
+      loadOverview(),
+      loadHealth(),
+      loadPipeline(),
+      loadCampaigns(),
+      loadExperiments(),
+      loadReplies(),
+      loadSequence(),
+      loadSkipList(),
+      loadSettings(),
+      loadInboxes(),
+      loadDrafts()
+    ]);
+
+    if (btn) btn.classList.remove('spinning');
+    document.getElementById('last-refresh-time').textContent = 'Last refresh: ' + new Date().toLocaleTimeString();
+  };
+
+  // Start SSE on page load
+  initActivitySSE();
 </script>
 </body>
 </html>
