@@ -4,7 +4,7 @@ import { logActivity } from '../utils/activity.js';
 import Anthropic from '@anthropic-ai/sdk';
 import logger from '../utils/logger.js';
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || "missing-key" });
 
 // Fast rule-based pre-filter before spending Claude tokens
 function quickClassify(text) {

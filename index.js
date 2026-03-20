@@ -1,5 +1,13 @@
 import 'dotenv/config';
 import cron from 'node-cron';
+
+// Prevent unhandled errors from silently killing the process on Railway
+process.on('uncaughtException', (err) => {
+  console.error('[ORACLE] uncaughtException — process kept alive:', err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[ORACLE] unhandledRejection — process kept alive:', reason);
+});
 import { runPipeline } from './src/pipeline/index.js';
 import { runExperimentLoop, scoreActiveExperiments } from './src/loop/experiment.js';
 import { pollAnalytics } from './src/analytics/tracker.js';

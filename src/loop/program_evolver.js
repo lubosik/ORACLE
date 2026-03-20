@@ -7,7 +7,7 @@ import { readFile, writeFile } from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || "missing-key" });
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const EVOLVE_AFTER_N_EXPERIMENTS = 10;
 

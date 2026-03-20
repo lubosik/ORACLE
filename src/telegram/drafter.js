@@ -3,7 +3,7 @@ import { buildAssetLibraryPrompt } from '../utils/assets.js';
 import logger from '../utils/logger.js';
 import 'dotenv/config';
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || "missing-key" });
 
 function buildSystemPrompt(assetLibrary, emailStep) {
   const stepNote = emailStep

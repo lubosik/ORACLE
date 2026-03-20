@@ -4,7 +4,7 @@ import { supabase } from '../utils/supabase.js';
 import { getEmail2Assets, buildAssetLibraryPrompt } from '../utils/assets.js';
 import 'dotenv/config';
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || "missing-key" });
 
 const EM_DASH = '\u2014';
 const EN_DASH = '\u2013';
