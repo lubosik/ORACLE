@@ -1,6 +1,7 @@
 import { markInboxesUsed } from './inbox_selector.js';
 import { markLeadCampaigned } from './deduplicator.js';
 import { logActivity } from '../utils/activity.js';
+import { getSchedule } from '../utils/settings.js';
 import { supabase } from '../utils/supabase.js';
 import { CONFIG } from '../config.js';
 import 'dotenv/config';
@@ -41,12 +42,20 @@ export async function launchApprovedCampaign(draft) {
       detail: { draft_id: draft.id, campaign_name: draft.campaign_name }
     });
 
-    // 1. Create campaign in Instantly
+    // 1. Load schedule from settings (Supabase-backed, adjustable from dashboard)
+    const schedule = await getSchedule();
+
+    // 2. Create campaign in Instantly
     const campaign = await instantlyRequest('/campaigns', 'POST', {
       name: draft.campaign_name,
       email_list: inboxes,
       campaign_schedule: {
-        schedules: [CONFIG.campaign_schedule]
+        schedules: [{
+          name: 'ORACLE Schedule',
+          timing: { from: schedule.timeFrom, to: schedule.timeTo },
+          days: schedule.daysObj,
+          timezone: schedule.timezone
+        }]
       },
       sequences: [{
         steps: [
@@ -57,6 +66,7 @@ export async function launchApprovedCampaign(draft) {
         ]
       }],
       ...CONFIG.campaign_settings,
+      daily_limit: schedule.dailyLimit,
       auto_variant_select: { trigger: 'reply_rate' }
     });
 

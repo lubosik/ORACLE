@@ -25,3 +25,20 @@ export async function setSetting(key, value) {
 export async function isOracleEnabled() {
   return (await getSetting('oracle_enabled', 'false')) === 'true';
 }
+
+// Returns the full campaign schedule object for use in Instantly campaign creation
+export async function getSchedule() {
+  const timeFrom   = await getSetting('send_time_from',   '08:00');
+  const timeTo     = await getSetting('send_time_to',     '17:30');
+  const daysStr    = await getSetting('send_days',        '1,2,3,4,5');
+  const timezone   = await getSetting('send_timezone',    'Europe/London');
+  const dailyLimit = parseInt(await getSetting('send_daily_limit', '50'));
+
+  const days = daysStr.split(',').map(d => d.trim());
+  const daysObj = {};
+  for (const d of ['0','1','2','3','4','5','6']) {
+    daysObj[d] = days.includes(d);
+  }
+
+  return { timeFrom, timeTo, days, daysObj, timezone, dailyLimit };
+}

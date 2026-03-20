@@ -8,7 +8,28 @@ import 'dotenv/config';
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-export async function generateHypothesis(ledgerEntries, currentBaseline) {
+const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+function buildTimingSection(timingInsights, currentSchedule) {
+  const lines = [];
+
+  if (timingInsights?.by_day) {
+    lines.push('DAY-OF-WEEK PERFORMANCE (weighted by emails sent):');
+    for (const [dow, v] of Object.entries(timingInsights.by_day)) {
+      if (!v) continue;
+      lines.push(`  ${DAY_NAMES[dow]}: ${(v.avg_reply_rate * 100).toFixed(2)}% reply rate, ${(v.avg_open_rate * 100).toFixed(1)}% open rate (n=${v.total_sent} emails)`);
+    }
+  }
+
+  if (currentSchedule) {
+    const activeDays = currentSchedule.days.map(d => DAY_NAMES[d] || d).join(', ');
+    lines.push(`\nCURRENT SEND SCHEDULE: ${currentSchedule.timeFrom}–${currentSchedule.timeTo} ${currentSchedule.timezone}, Days: ${activeDays}, Daily limit: ${currentSchedule.dailyLimit}`);
+  }
+
+  return lines.length ? lines.join('\n') : '';
+}
+
+export async function generateHypothesis(ledgerEntries, currentBaseline, timingInsights = null, currentSchedule = null) {
   let programMd = '';
   try {
     programMd = await readFile(join(__dirname, '../program.md'), 'utf8');
@@ -18,7 +39,7 @@ export async function generateHypothesis(ledgerEntries, currentBaseline) {
 
   const ledgerSummary = ledgerEntries.length
     ? ledgerEntries.map(e =>
-        `- ${e.variant_id}: ${e.what_changed} | rate: ${e.positive_reply_rate || 'pending'} | outcome: ${e.outcome}`
+        `- ${e.variant_id} [${e.change_type || 'copy'}]: ${e.what_changed} | rate: ${e.positive_reply_rate != null ? (e.positive_reply_rate * 100).toFixed(2) + '%' : 'pending'} | outcome: ${e.outcome}`
       ).join('\n')
     : 'No experiments yet. This is the first hypothesis.';
 
@@ -26,12 +47,14 @@ export async function generateHypothesis(ledgerEntries, currentBaseline) {
     ? `${(currentBaseline.positive_reply_rate * 100).toFixed(2)}%`
     : 'Not yet established';
 
+  const timingSection = buildTimingSection(timingInsights, currentSchedule);
+
   const message = await anthropic.messages.create({
     model: 'claude-sonnet-4-20250514',
-    max_tokens: 800,
+    max_tokens: 900,
     messages: [{
       role: 'user',
-      content: `You are running Karpathy-style self-improvement experiments on cold email sequences for AIRO.
+      content: `You are running Karpathy-style self-improvement experiments on cold email campaigns for AIRO.
 
 RESEARCH PROGRAM:
 ${programMd}
@@ -41,15 +64,29 @@ CURRENT BASELINE POSITIVE REPLY RATE: ${baselineRate}
 RECENT EXPERIMENT LEDGER (last 10):
 ${ledgerSummary}
 
-Propose ONE specific, testable change to the email sequence. Be concrete. Name exactly what changes and why you believe it will improve positive reply rate.
+${timingSection ? timingSection + '\n' : ''}
+Propose ONE specific, testable change that you believe will improve positive reply rate. You may test either copy changes OR sending schedule changes based on the data above. Be concrete and data-driven.
+
+If proposing a schedule change, set change_type to "send_schedule" and populate schedule_changes with the new values. Leave instructions_for_copywriter as null.
+If proposing a copy change, set change_type to one of the copy types and leave schedule_changes as null.
 
 Return ONLY valid JSON:
 {
   "variant_id": "v_{{short_descriptor}}_{{unix_timestamp}}",
   "hypothesis": "one sentence: what you believe and why",
   "what_changed": "specific description of the change",
-  "change_type": "subject_line | opening_line | offer_framing | social_proof | cta | email_3_education | email_4_close",
-  "instructions_for_copywriter": "precise instructions: what to do differently when generating copy for this variant"
+  "change_type": "subject_line | opening_line | offer_framing | social_proof | cta | email_3_education | email_4_close | send_schedule",
+  "instructions_for_copywriter": "precise copy instructions, or null if this is a schedule experiment",
+  "schedule_changes": null
+}
+
+For schedule_changes (only when change_type is send_schedule), use:
+{
+  "timeFrom": "HH:MM",
+  "timeTo": "HH:MM",
+  "days": ["1","2","3","4","5"],
+  "dailyLimit": 50,
+  "rationale": "why this schedule should outperform"
 }`
     }]
   });

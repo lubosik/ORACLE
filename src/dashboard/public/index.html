@@ -1387,6 +1387,49 @@
         </div>
       </div>
 
+      <!-- Sending Schedule -->
+      <div class="card" style="padding:24px;">
+        <div class="card-title" style="margin-bottom:4px;">Sending Schedule</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:16px;">Read by every campaign. Karpathy loop will auto-tune based on analytics.</div>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <label style="font-size:12px;color:var(--text-secondary);">
+              Send from
+              <input id="ctrl-time-from" type="time" style="display:block;margin-top:6px;width:100%;background:rgba(255,255,255,0.05);border:1px solid var(--card-border);border-radius:6px;padding:7px 10px;color:var(--text-primary);font-family:var(--font-mono);font-size:13px;outline:none;color-scheme:dark;">
+            </label>
+            <label style="font-size:12px;color:var(--text-secondary);">
+              Send until
+              <input id="ctrl-time-to" type="time" style="display:block;margin-top:6px;width:100%;background:rgba(255,255,255,0.05);border:1px solid var(--card-border);border-radius:6px;padding:7px 10px;color:var(--text-primary);font-family:var(--font-mono);font-size:13px;outline:none;color-scheme:dark;">
+            </label>
+          </div>
+          <label style="font-size:12px;color:var(--text-secondary);">
+            Timezone
+            <input id="ctrl-timezone" type="text" placeholder="Europe/London" style="display:block;margin-top:6px;width:100%;background:rgba(255,255,255,0.05);border:1px solid var(--card-border);border-radius:6px;padding:7px 10px;color:var(--text-primary);font-family:var(--font-mono);font-size:12px;outline:none;">
+          </label>
+          <label style="font-size:12px;color:var(--text-secondary);">
+            Daily send limit (emails/day)
+            <input id="ctrl-daily-limit" type="number" min="1" style="display:block;margin-top:6px;width:100%;background:rgba(255,255,255,0.05);border:1px solid var(--card-border);border-radius:6px;padding:7px 10px;color:var(--text-primary);font-family:var(--font-mono);font-size:13px;outline:none;">
+          </label>
+          <div style="font-size:12px;color:var(--text-secondary);">Active days</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;" id="ctrl-days-wrap">
+            <label class="day-toggle" data-day="1">Mon</label>
+            <label class="day-toggle" data-day="2">Tue</label>
+            <label class="day-toggle" data-day="3">Wed</label>
+            <label class="day-toggle" data-day="4">Thu</label>
+            <label class="day-toggle" data-day="5">Fri</label>
+            <label class="day-toggle" data-day="6">Sat</label>
+            <label class="day-toggle" data-day="0">Sun</label>
+          </div>
+          <button onclick="saveSchedule()" style="
+            background:rgba(124,92,252,0.15);border:1px solid rgba(124,92,252,0.35);
+            color:var(--violet-bright);border-radius:8px;padding:8px 16px;
+            font-size:12px;cursor:pointer;font-family:var(--font-body);font-weight:500;
+            transition:all 0.2s;margin-top:4px;
+          ">Save Schedule</button>
+          <div id="ctrl-schedule-confirm" style="display:none;font-size:11px;color:var(--green);font-family:var(--font-mono);"></div>
+        </div>
+      </div>
+
     </div>
 
     <!-- Inbox Status Table -->
@@ -1491,6 +1534,12 @@
 .draft-btn.approve:hover { background:rgba(0,232,150,0.2); }
 .draft-btn.reject { background:rgba(255,68,102,0.08);border-color:rgba(255,68,102,0.25);color:var(--red); }
 .draft-btn.reject:hover { background:rgba(255,68,102,0.15); }
+.day-toggle {
+  padding:5px 11px;border-radius:6px;font-size:11px;font-weight:600;letter-spacing:0.05em;
+  cursor:pointer;user-select:none;transition:all 0.2s;
+  background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);color:var(--text-muted);
+}
+.day-toggle.active { background:rgba(124,92,252,0.18);border-color:rgba(124,92,252,0.45);color:var(--violet-bright); }
 </style>
 
 <script>
@@ -1946,9 +1995,99 @@
     } catch (e) { console.error('Remove domain failed', e); }
   };
 
-  // ---- Initial load + auto-refresh every 30s ----
+  // ---- Soft update: only repaint a section if its data actually changed ----
+  const _dataCache = {};
+  function _changed(key, data) {
+    const s = JSON.stringify(data);
+    if (_dataCache[key] === s) return false;
+    _dataCache[key] = s;
+    return true;
+  }
+
+  // Wrap the heavy innerHTML sections with cache guards so they only repaint on change
+  const _origLoadHealth = loadHealth;
+  loadHealth = async function() {
+    const r = await fetch('/api/health').catch(() => null);
+    if (!r) return;
+    const d = await r.json();
+    if (!_changed('health', d)) return;
+    await _origLoadHealth();
+  };
+
+  const _origLoadCampaigns = loadCampaigns;
+  loadCampaigns = async function() {
+    const r = await fetch('/api/campaigns').catch(() => null);
+    if (!r) return;
+    const d = await r.json();
+    if (!_changed('campaigns', d)) return;
+    await _origLoadCampaigns();
+  };
+
+  const _origLoadExperiments = loadExperiments;
+  loadExperiments = async function() {
+    const r = await fetch('/api/experiments').catch(() => null);
+    if (!r) return;
+    const d = await r.json();
+    if (!_changed('experiments', d)) return;
+    await _origLoadExperiments();
+  };
+
+  const _origLoadSkipList = loadSkipList;
+  loadSkipList = async function() {
+    const r = await fetch('/api/skip-list').catch(() => null);
+    if (!r) return;
+    const d = await r.json();
+    if (!_changed('skiplist', d)) return;
+    await _origLoadSkipList();
+  };
+
+  const _origLoadSequence = loadSequence;
+  loadSequence = async function() {
+    const r = await fetch('/api/copy').catch(() => null);
+    if (!r) return;
+    const d = await r.json();
+    if (!_changed('sequence', d)) return;
+    await _origLoadSequence();
+  };
+
+  const _origLoadAssets = loadAssets;
+  loadAssets = async function() {
+    const r = await fetch('/api/assets').catch(() => null);
+    if (!r) return;
+    const d = await r.json();
+    if (!_changed('assets', d)) return;
+    await _origLoadAssets();
+  };
+
+  const _origLoadInboxes = loadInboxes;
+  loadInboxes = async function() {
+    const r = await fetch('/api/inboxes').catch(() => null);
+    if (!r) return;
+    const d = await r.json();
+    if (!_changed('inboxes', d)) return;
+    await _origLoadInboxes();
+  };
+
+  // ---- Initial load ----
   refreshAll();
-  setInterval(refreshAll, 30000);
+
+  // ---- Staggered selective polling — no more simultaneous full-page repaints ----
+  // Fast: things you need to see update quickly
+  setInterval(loadOverview,  30000);
+  setInterval(loadPipeline,  30000);
+  setInterval(loadDrafts,    30000);
+  setInterval(loadReplies,   30000);
+  // Medium: operational data
+  setInterval(loadHealth,    60000);
+  setInterval(loadSettings,  60000);
+  setInterval(loadInboxes,   90000);
+  // Slow: heavy tables — only repaints if data changed
+  setInterval(loadCampaigns,    180000);
+  setInterval(loadExperiments,  300000);
+  // Very slow: rarely changes
+  setInterval(loadSkipList,  600000);
+  setInterval(loadSequence,  600000);
+  setInterval(loadAssets,    600000);
 
   // ============================================================
   // CAMPAIGN ASSETS
@@ -2105,6 +2244,11 @@
     } catch(e) { console.error('Oracle toggle failed', e); }
   }
 
+  // Day toggle interactivity
+  document.querySelectorAll('.day-toggle').forEach(el => {
+    el.addEventListener('click', () => el.classList.toggle('active'));
+  });
+
   async function loadSettings() {
     try {
       const r = await fetch('/api/settings');
@@ -2114,7 +2258,39 @@
       document.getElementById('ctrl-require-warm').checked = s.require_warm_inboxes_only !== 'false';
       document.getElementById('ctrl-inboxes-count').value = s.inboxes_per_campaign || 3;
       applyOracleSupabaseUI(s.oracle_enabled === 'true');
+      // Schedule
+      if (s.send_time_from) document.getElementById('ctrl-time-from').value = s.send_time_from;
+      if (s.send_time_to)   document.getElementById('ctrl-time-to').value   = s.send_time_to;
+      if (s.send_timezone)  document.getElementById('ctrl-timezone').value  = s.send_timezone;
+      if (s.send_daily_limit) document.getElementById('ctrl-daily-limit').value = s.send_daily_limit;
+      if (s.send_days) {
+        const active = s.send_days.split(',').map(d => d.trim());
+        document.querySelectorAll('.day-toggle').forEach(el => {
+          el.classList.toggle('active', active.includes(el.dataset.day));
+        });
+      }
     } catch(e) { console.error('Load settings failed', e); }
+  }
+
+  async function saveSchedule() {
+    const timeFrom   = document.getElementById('ctrl-time-from').value;
+    const timeTo     = document.getElementById('ctrl-time-to').value;
+    const timezone   = document.getElementById('ctrl-timezone').value.trim();
+    const dailyLimit = document.getElementById('ctrl-daily-limit').value;
+    const days       = [...document.querySelectorAll('.day-toggle.active')].map(el => el.dataset.day).join(',');
+    try {
+      await Promise.all([
+        fetch('/api/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ key:'send_time_from',   value: timeFrom }) }),
+        fetch('/api/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ key:'send_time_to',     value: timeTo }) }),
+        fetch('/api/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ key:'send_timezone',    value: timezone }) }),
+        fetch('/api/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ key:'send_daily_limit', value: dailyLimit }) }),
+        fetch('/api/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ key:'send_days',        value: days }) })
+      ]);
+      const c = document.getElementById('ctrl-schedule-confirm');
+      c.textContent = 'Schedule saved. All future campaigns will use these settings.';
+      c.style.display = 'block';
+      setTimeout(() => c.style.display = 'none', 3000);
+    } catch(e) { console.error('Save schedule failed', e); }
   }
 
   async function saveLeadLimits() {
@@ -2318,9 +2494,10 @@
     };
   }
 
-  // ---- Extend refreshAll to include new sections ----
-  const _origRefreshAll = refreshAll;
+  // ---- Full manual refresh (used by the refresh button only) ----
+  // Bypasses cache so user gets fresh data on demand
   refreshAll = async function() {
+    Object.keys(_dataCache).forEach(k => delete _dataCache[k]); // clear cache
     const btn = document.getElementById('refresh-btn');
     if (btn) btn.classList.add('spinning');
     document.getElementById('last-refresh-time').textContent = 'Refreshing...';

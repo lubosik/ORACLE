@@ -38,6 +38,8 @@ export async function logExperiment(experiment) {
       campaign_id: experiment.campaign_id,
       hypothesis: experiment.hypothesis,
       what_changed: experiment.what_changed,
+      change_type: experiment.change_type || null,
+      schedule_snapshot: experiment.schedule_snapshot || null,
       launched_at: new Date().toISOString(),
       outcome: 'pending'
     })

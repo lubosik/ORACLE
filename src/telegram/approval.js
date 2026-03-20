@@ -1,11 +1,17 @@
 import { supabase } from '../utils/supabase.js';
 import { logActivity } from '../utils/activity.js';
+import { getSchedule } from '../utils/settings.js';
+
+const DAY_NAMES = { '0':'Sun','1':'Mon','2':'Tue','3':'Wed','4':'Thu','5':'Fri','6':'Sat' };
 
 export async function sendCampaignApprovalRequest(bot, chatId, draft) {
   const inboxList = Array.isArray(draft.selected_inboxes)
     ? draft.selected_inboxes.join('\n  ')
     : draft.selected_inboxes;
   const seq = draft.sequence_snapshot;
+
+  const schedule = await getSchedule();
+  const activeDays = schedule.days.map(d => DAY_NAMES[d] || d).join(', ');
 
   const truncate = (str, n) => (str || '').length > n ? (str || '').slice(0, n) + '...' : (str || '');
 
@@ -17,6 +23,11 @@ Variant: ${draft.variant_id || 'v1_baseline'}
 
 INBOXES SELECTED:
   ${inboxList}
+
+SENDING SCHEDULE:
+  ${schedule.timeFrom} — ${schedule.timeTo} ${schedule.timezone}
+  Days: ${activeDays}
+  Daily limit: ${schedule.dailyLimit} emails/day
 
 EMAIL 1
 Subject: ${seq.email_1.subject}
