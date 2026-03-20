@@ -19,6 +19,7 @@ import { evolveProgramIfReady } from './src/loop/program_evolver.js';
 import { monitorDeliverability } from './src/loop/deliverability_monitor.js';
 import { analyzeCohorts } from './src/loop/cohort_analyzer.js';
 import { proposeVerticalExpansion } from './src/loop/vertical_researcher.js';
+import { checkForEarlyAbort } from './src/loop/early_abort.js';
 
 // Dashboard and Telegram always run regardless of engine state
 startDashboard();
@@ -32,6 +33,13 @@ cron.schedule('0 1 * * *', async () => {
   }
   logger.info('ORACLE pipeline starting (scheduled)');
   await runPipeline();
+});
+
+// Early abort check: every 4 hours — fast-fail broken experiments before the 7-day window
+cron.schedule('0 */4 * * *', async () => {
+  if (!(await isOracleEnabled())) return;
+  logger.info('Running early abort check');
+  await checkForEarlyAbort();
 });
 
 // Score experiments + generate next hypothesis: every 6 hours

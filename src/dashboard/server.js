@@ -699,6 +699,36 @@ app.patch('/api/research/verticals/:id', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.get('/api/research/trajectory', async (req, res) => {
+  try {
+    const { data: experiments } = await supabase
+      .from('experiment_ledger')
+      .select('id, variant_id, what_changed, change_type, positive_reply_rate, open_rate, delta, outcome, launched_at, scored_at, sends, notes')
+      .not('outcome', 'eq', 'pending')
+      .order('launched_at', { ascending: true });
+
+    const { data: baseline } = await supabase
+      .from('baselines')
+      .select('positive_reply_rate, promoted_at')
+      .eq('vertical', 'real_estate')
+      .single();
+
+    // Running frontier = best positive_reply_rate seen so far at each point
+    let runningMax = 0;
+    const frontier = (experiments || []).map(exp => {
+      if ((exp.positive_reply_rate || 0) > runningMax) runningMax = exp.positive_reply_rate;
+      return runningMax;
+    });
+
+    res.json({
+      experiments: experiments || [],
+      frontier,
+      baseline_rate: baseline?.positive_reply_rate || null,
+      baseline_promoted_at: baseline?.promoted_at || null
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.get('/api/research/bandit', async (req, res) => {
   try {
     res.json(await getBanditState());

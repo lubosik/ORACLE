@@ -81,6 +81,14 @@ export async function launchApprovedCampaign(draft) {
 
     if (!campaign.id) throw new Error(`Instantly campaign creation failed: ${JSON.stringify(campaign)}`);
 
+    // Link the Instantly campaign_id back to the experiment_ledger row for this variant
+    // so scoring and early-abort can find the campaign's stats
+    await supabase
+      .from('experiment_ledger')
+      .update({ campaign_id: campaign.id })
+      .eq('variant_id', draft.variant_id)
+      .eq('outcome', 'pending');
+
     // 2. Bulk add leads in batches of 1000
     const leads = Array.isArray(draft.leads_snapshot)
       ? draft.leads_snapshot
