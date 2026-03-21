@@ -50,10 +50,15 @@ app.get('/api/health', async (req, res) => {
 
   // Instantly
   try {
-    const r = await fetch(`${process.env.INSTANTLY_BASE_URL}/campaigns?limit=1`, {
-      headers: { 'Authorization': `Bearer ${process.env.INSTANTLY_API_KEY}` }
-    });
-    checks.instantly = { status: r.ok ? 'connected' : 'error', http_status: r.status };
+    if (!process.env.INSTANTLY_API_KEY) {
+      checks.instantly = { status: 'missing' };
+    } else {
+      const instantlyBase = process.env.INSTANTLY_BASE_URL || 'https://api.instantly.ai/api/v2';
+      const r = await fetch(`${instantlyBase}/campaigns?limit=1`, {
+        headers: { 'Authorization': `Bearer ${process.env.INSTANTLY_API_KEY}` }
+      });
+      checks.instantly = { status: r.ok ? 'connected' : 'error', http_status: r.status };
+    }
   } catch (e) {
     checks.instantly = { status: 'error', error: e.message };
   }
