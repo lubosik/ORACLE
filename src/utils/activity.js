@@ -54,6 +54,7 @@ export function activitySSEHandler(req, res) {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering (Railway/proxies)
   res.flushHeaders();
 
   // Send last 100 entries on connect
@@ -61,7 +62,16 @@ export function activitySSEHandler(req, res) {
   res.write(`data: ${JSON.stringify({ type: 'history', entries: recent })}\n\n`);
 
   sseClients.add(res);
-  req.on('close', () => sseClients.delete(res));
+
+  // Keepalive ping every 25s to prevent Railway/proxy timeout (30s default)
+  const heartbeat = setInterval(() => {
+    try { res.write(': heartbeat\n\n'); } catch { clearInterval(heartbeat); sseClients.delete(res); }
+  }, 25000);
+
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    sseClients.delete(res);
+  });
 }
 
 export { activityBuffer };

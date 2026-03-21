@@ -58,17 +58,61 @@ app.get('/api/health', async (req, res) => {
     checks.instantly = { status: 'error', error: e.message };
   }
 
-  // Anthropic
-  checks.anthropic = { status: process.env.ANTHROPIC_API_KEY ? 'configured' : 'missing' };
+  // Anthropic — live ping
+  try {
+    if (!process.env.ANTHROPIC_API_KEY) {
+      checks.anthropic = { status: 'missing' };
+    } else {
+      const ar = await fetch('https://api.anthropic.com/v1/models', {
+        headers: {
+          'x-api-key': process.env.ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01'
+        }
+      });
+      checks.anthropic = { status: ar.ok ? 'connected' : 'error', http_status: ar.status };
+    }
+  } catch (e) {
+    checks.anthropic = { status: 'error', error: e.message };
+  }
 
-  // xAI Grok
-  checks.grok = { status: process.env.XAI_API_KEY ? 'configured' : 'missing' };
+  // xAI Grok — live ping
+  try {
+    if (!process.env.XAI_API_KEY) {
+      checks.grok = { status: 'missing' };
+    } else {
+      const xr = await fetch('https://api.x.ai/v1/models', {
+        headers: { 'Authorization': `Bearer ${process.env.XAI_API_KEY}` }
+      });
+      checks.grok = { status: xr.ok ? 'connected' : 'error', http_status: xr.status };
+    }
+  } catch (e) {
+    checks.grok = { status: 'error', error: e.message };
+  }
 
   // Apify
-  checks.apify = { status: process.env.APIFY_API_TOKEN ? 'configured' : 'missing' };
+  try {
+    if (!process.env.APIFY_API_TOKEN) {
+      checks.apify = { status: 'missing' };
+    } else {
+      const apr = await fetch(`https://api.apify.com/v2/users/me?token=${process.env.APIFY_API_TOKEN}`);
+      checks.apify = { status: apr.ok ? 'connected' : 'error', http_status: apr.status };
+    }
+  } catch (e) {
+    checks.apify = { status: 'error', error: e.message };
+  }
 
   // Telegram
-  checks.telegram = { status: process.env.TELEGRAM_BOT_TOKEN ? 'configured' : 'missing' };
+  try {
+    if (!process.env.TELEGRAM_BOT_TOKEN) {
+      checks.telegram = { status: 'missing' };
+    } else {
+      const tr = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/getMe`);
+      const td = await tr.json();
+      checks.telegram = { status: td.ok ? 'connected' : 'error', bot: td.result?.username };
+    }
+  } catch (e) {
+    checks.telegram = { status: 'error', error: e.message };
+  }
 
   res.json(checks);
 });

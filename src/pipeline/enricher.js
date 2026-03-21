@@ -2,7 +2,8 @@ import logger from '../utils/logger.js';
 import { supabase } from '../utils/supabase.js';
 import 'dotenv/config';
 
-const GROK_API_URL = 'https://api.x.ai/v1/chat/completions';
+// Uses xAI Responses API with web_search tool (chat/completions Live Search is deprecated)
+const GROK_RESPONSES_URL = 'https://api.x.ai/v1/responses';
 
 function buildFallback(lead) {
   return {
@@ -14,7 +15,7 @@ function buildFallback(lead) {
 
 export async function enrichLead(lead) {
   try {
-    const response = await fetch(GROK_API_URL, {
+    const response = await fetch(GROK_RESPONSES_URL, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${process.env.XAI_API_KEY}`,
@@ -22,7 +23,7 @@ export async function enrichLead(lead) {
       },
       body: JSON.stringify({
         model: 'grok-3',
-        messages: [{
+        input: [{
           role: 'user',
           content: `Research this company and return ONLY valid JSON, no preamble, no markdown:
 
@@ -37,16 +38,19 @@ Return exactly:
   "personalisation_hook": "one sentence for the start of a cold email. Must feel like a real person noticed something specific. Never mention AI. Never sound like a pitch. Under 20 words. Always true."
 }`
         }],
-        search_parameters: { mode: 'on' }
+        tools: [{ type: 'web_search' }]
       })
     });
 
     if (!response.ok) {
-      throw new Error(`Grok API error: ${response.status} ${response.statusText}`);
+      const errText = await response.text();
+      throw new Error(`Grok API error: ${response.status} ${errText}`);
     }
 
     const data = await response.json();
-    const content = data.choices?.[0]?.message?.content || '';
+    // Responses API returns output array; find the message content
+    const outputItem = data.output?.find(o => o.type === 'message');
+    const content = outputItem?.content?.find(c => c.type === 'output_text')?.text || '';
 
     let parsed;
     try {

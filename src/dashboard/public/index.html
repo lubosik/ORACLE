@@ -1731,6 +1731,8 @@
           : (st === 'error' || st === 'missing') ? 'error' : 'warn';
         const sub = st === 'connected' && item.detail?.lead_count !== undefined
           ? `${item.detail.lead_count.toLocaleString()} leads`
+          : st === 'connected' && item.detail?.bot
+          ? `@${item.detail.bot}`
           : st;
         return `<div class="health-item">
           <div class="health-dot ${dotClass}"></div>
@@ -1739,7 +1741,7 @@
       }).join('');
       document.getElementById('health-updated').textContent = 'as of ' + new Date().toLocaleTimeString();
     } catch(e) {
-      document.getElementById('health-updated').textContent = 'check failed';
+      document.getElementById('health-updated').textContent = 'check failed — ' + e.message;
     }
   }
 
