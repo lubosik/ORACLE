@@ -42,7 +42,8 @@ app.get('/api/health', async (req, res) => {
 
   // Supabase
   try {
-    const { count } = await supabase.from('seen_leads').select('*', { count: 'exact', head: true });
+    const { count, error } = await supabase.from('seen_leads').select('*', { count: 'exact', head: true });
+    if (error) throw new Error(error.message);
     checks.supabase = { status: 'connected', lead_count: count };
   } catch (e) {
     checks.supabase = { status: 'error', error: e.message };

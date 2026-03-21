@@ -2304,24 +2304,35 @@
 
     const activeGroup = _geoData.groups.find(g => g.id === active);
     if (activeGroup && preview) {
+      const targetNames = activeGroup.targets.map(t => typeof t === 'string' ? t : (t.city || t.state || '')).filter(Boolean).join(', ');
       preview.innerHTML = `<span style="color:var(--crystal);">${activeGroup.label}</span>  ·  ${activeGroup.timezone}<br>` +
-        `<span style="color:var(--text-muted);">Targets (in order): </span>${activeGroup.targets.join(', ')}`;
+        `<span style="color:var(--text-muted);">Targets (in order): </span>${targetNames}`;
     }
   }
 
   async function setGeoGroup(groupId) {
+    const c = document.getElementById('ctrl-geo-confirm');
     try {
-      await fetch('/api/geo', {
+      const r = await fetch('/api/geo', {
         method: 'POST',
         headers: {'Content-Type':'application/json'},
         body: JSON.stringify({ group_id: groupId })
       });
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        throw new Error(d.error || `HTTP ${r.status}`);
+      }
       await loadGeo();
-      const c = document.getElementById('ctrl-geo-confirm');
       c.textContent = `Geo set to ${_geoData?.groups.find(g => g.id === groupId)?.label}. Next pipeline run will target this market.`;
+      c.style.color = 'var(--green)';
       c.style.display = 'block';
       setTimeout(() => c.style.display = 'none', 4000);
-    } catch(e) { console.error('Set geo failed', e); }
+    } catch(e) {
+      c.textContent = 'Failed to set geo: ' + e.message;
+      c.style.color = 'var(--red)';
+      c.style.display = 'block';
+      setTimeout(() => c.style.display = 'none', 6000);
+    }
   }
 
   async function saveInboxSettings() {
