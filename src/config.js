@@ -10,7 +10,7 @@ export const CONFIG = {
           'Head of Lettings', 'Sales Manager', 'Property Director',
           'Managing Partner', 'President', 'Owner'
         ],
-        industry: ['Real Estate', 'Commercial Real Estate', 'Property Management'],
+        industry: ['Real Estate'],
         companyEmployeeSize: ['2 - 10', '11 - 50', '51 - 200', '201 - 500'],
         personCountry: ['United Kingdom', 'United States'],
         contactEmailStatus: 'verified',
