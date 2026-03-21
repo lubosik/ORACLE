@@ -230,6 +230,22 @@ app.get('/api/copy', async (req, res) => {
   }
 });
 
+// Manual pipeline trigger
+app.post('/api/pipeline/run', async (req, res) => {
+  try {
+    const { isOracleEnabled } = await import('../utils/settings.js');
+    if (!(await isOracleEnabled())) {
+      return res.status(403).json({ error: 'ORACLE engine is disabled — enable it from the dashboard first' });
+    }
+    res.json({ ok: true, message: 'Pipeline triggered — watch the activity feed and Telegram' });
+    // Run async after responding so HTTP doesn't time out
+    const { runPipeline } = await import('../pipeline/index.js');
+    runPipeline().catch(err => logger.error('Manual pipeline trigger failed', { error: err.message }));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Pipeline status
 app.get('/api/pipeline', async (req, res) => {
   try {

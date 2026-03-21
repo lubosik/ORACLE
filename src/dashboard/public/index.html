@@ -1027,7 +1027,10 @@
     <div class="card">
       <div class="card-header">
         <div class="card-title">Last Pipeline Run</div>
-        <div id="pipeline-status-badge"></div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div id="pipeline-status-badge"></div>
+          <button id="run-pipeline-btn" onclick="triggerPipeline()" style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid rgba(99,102,241,0.5);background:rgba(99,102,241,0.15);color:var(--accent);cursor:pointer;font-family:var(--font-mono);transition:all 0.2s" onmouseover="this.style.background='rgba(99,102,241,0.3)'" onmouseout="this.style.background='rgba(99,102,241,0.15)'">&#9654; Run Now</button>
+        </div>
       </div>
       <div id="pipeline-content">
         <div class="skeleton" style="height:14px;width:60%;margin-bottom:8px"></div>
@@ -1756,6 +1759,35 @@
       document.getElementById('health-updated').textContent = 'as of ' + new Date().toLocaleTimeString();
     } catch(e) {
       document.getElementById('health-updated').textContent = 'check failed — ' + e.message;
+    }
+  }
+
+  // ---- Manual pipeline trigger ----
+  async function triggerPipeline() {
+    const btn = document.getElementById('run-pipeline-btn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Starting...';
+    try {
+      const r = await fetch('/api/pipeline/run', { method: 'POST' });
+      const d = await r.json();
+      if (!r.ok) {
+        btn.textContent = '✖ ' + (d.error || 'Error');
+        setTimeout(() => { btn.disabled = false; btn.innerHTML = '&#9654; Run Now'; }, 4000);
+      } else {
+        btn.textContent = '✓ Running';
+        btn.style.color = 'var(--green)';
+        btn.style.borderColor = 'rgba(16,185,129,0.5)';
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.innerHTML = '&#9654; Run Now';
+          btn.style.color = 'var(--accent)';
+          btn.style.borderColor = 'rgba(99,102,241,0.5)';
+          loadPipeline();
+        }, 5000);
+      }
+    } catch(e) {
+      btn.textContent = '✖ Failed';
+      setTimeout(() => { btn.disabled = false; btn.innerHTML = '&#9654; Run Now'; }, 4000);
     }
   }
 
