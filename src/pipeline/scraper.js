@@ -66,7 +66,7 @@ export async function scrapeLeads(vertical = 'real_estate', geoTarget = null) {
   let run, items;
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      run = await client.actor(process.env.APIFY_ACTOR_ID).call(input, { timeoutSecs: 300 });
+      run = await client.actor(process.env.APIFY_ACTOR_ID).call(input, { timeout: 300 });
       ({ items } = await client.dataset(run.defaultDatasetId).listItems());
       break; // success
     } catch (err) {
