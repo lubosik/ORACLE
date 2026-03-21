@@ -21,21 +21,25 @@ export async function setSetting(key, value) {
   const strVal = String(value);
 
   // Check if row already exists
-  const { data: existing } = await supabase
+  const { data: existing, error: selectErr } = await supabase
     .from('system_settings')
     .select('key')
     .eq('key', key)
     .maybeSingle();
 
+  if (selectErr) throw new Error(`setSetting select failed: ${selectErr.message}`);
+
   if (existing) {
-    await supabase
+    const { error } = await supabase
       .from('system_settings')
       .update({ value: strVal })
       .eq('key', key);
+    if (error) throw new Error(`setSetting update failed: ${error.message}`);
   } else {
-    await supabase
+    const { error } = await supabase
       .from('system_settings')
       .insert({ key, value: strVal });
+    if (error) throw new Error(`setSetting insert failed: ${error.message}`);
   }
 
   // Always update cache immediately

@@ -484,6 +484,7 @@ app.post('/api/settings', async (req, res) => {
     await setSetting(key, value);
     res.json({ ok: true });
   } catch (err) {
+    logger.error('setSetting failed', { key: req.body?.key, error: err.message });
     res.status(500).json({ error: err.message });
   }
 });

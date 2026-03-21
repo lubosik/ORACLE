@@ -55,6 +55,8 @@
       z-index: 0;
       pointer-events: none;
       overflow: hidden;
+      contain: strict; /* isolate starfield repaints from main layout */
+      transform: translateZ(0);
     }
     .star {
       position: absolute;
@@ -62,6 +64,7 @@
       background: white;
       animation: twinkle var(--duration, 4s) ease-in-out infinite;
       animation-delay: var(--delay, 0s);
+      will-change: opacity;
     }
     @keyframes twinkle {
       0%, 100% { opacity: var(--min-op, 0.1); transform: scale(1); }
@@ -80,25 +83,36 @@
       width: 600px; height: 600px;
       background: radial-gradient(circle, rgba(124, 92, 252, 0.12) 0%, transparent 70%);
       top: -100px; left: -100px;
+      /* Use opacity-only animation — avoids triggering layout/paint on every frame */
       animation: nebulaPulse 8s ease-in-out infinite;
+      will-change: opacity;
+      transform: translateZ(0); /* promote to own GPU layer */
     }
     .nebula-2 {
       width: 500px; height: 500px;
       background: radial-gradient(circle, rgba(0, 212, 255, 0.08) 0%, transparent 70%);
       bottom: -50px; right: -50px;
       animation: nebulaPulse 10s ease-in-out infinite reverse;
+      will-change: opacity;
+      transform: translateZ(0);
     }
     .nebula-3 {
       width: 400px; height: 400px;
       background: radial-gradient(circle, rgba(240, 192, 64, 0.06) 0%, transparent 70%);
       top: 40%; left: 50%;
-      transform: translate(-50%, -50%);
-      animation: nebulaPulse 12s ease-in-out infinite;
+      /* translate(-50%,-50%) must live in animation since keyframes override transform */
+      animation: nebulaPulse3 12s ease-in-out infinite;
+      will-change: opacity;
     }
     @keyframes nebulaPulse {
-      0%, 100% { transform: scale(1) translate(0, 0); opacity: 1; }
-      33% { transform: scale(1.1) translate(20px, -10px); opacity: 0.8; }
-      66% { transform: scale(0.9) translate(-10px, 15px); opacity: 0.9; }
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+    @keyframes nebulaPulse3 {
+      /* keep the centering translate constant across all keyframes */
+      0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+      33% { transform: translate(-50%, -50%) scale(1.05); opacity: 0.8; }
+      66% { transform: translate(-50%, -50%) scale(0.95); opacity: 0.9; }
     }
 
     /* ---- Layout ---- */
@@ -1729,7 +1743,7 @@
         const st = item.detail?.status || 'unknown';
         const dotClass = (st === 'connected' || st === 'configured') ? 'ok'
           : (st === 'error' || st === 'missing') ? 'error' : 'warn';
-        const sub = st === 'connected' && item.detail?.lead_count !== undefined
+        const sub = st === 'connected' && item.detail?.lead_count != null
           ? `${item.detail.lead_count.toLocaleString()} leads`
           : st === 'connected' && item.detail?.bot
           ? `@${item.detail.bot}`
@@ -1917,10 +1931,10 @@
     renderEmail(idx);
   };
 
-  // ---- Refresh all ----
+  // ---- Refresh all (single definition used by button + initial load) ----
   async function refreshAll() {
     const btn = document.getElementById('refresh-btn');
-    btn.classList.add('spinning');
+    if (btn) btn.classList.add('spinning');
     document.getElementById('last-refresh-time').textContent = 'Refreshing...';
 
     await Promise.allSettled([
@@ -1931,10 +1945,15 @@
       loadExperiments(),
       loadReplies(),
       loadSequence(),
-      loadSkipList()
+      loadSkipList(),
+      loadSettings(),
+      loadInboxes(),
+      loadDrafts(),
+      loadAssets(),
+      loadResearch()
     ]);
 
-    btn.classList.remove('spinning');
+    if (btn) btn.classList.remove('spinning');
     document.getElementById('last-refresh-time').textContent = 'Last refresh: ' + new Date().toLocaleTimeString();
   }
 
@@ -2006,23 +2025,25 @@
   // ---- Initial load ----
   refreshAll();
 
-  // ---- Staggered selective polling — no more simultaneous full-page repaints ----
-  // Fast: things you need to see update quickly
-  setInterval(loadOverview,  30000);
-  setInterval(loadPipeline,  30000);
-  setInterval(loadDrafts,    30000);
-  setInterval(loadReplies,   30000);
-  // Medium: operational data
-  setInterval(loadHealth,    60000);
-  setInterval(loadSettings,  60000);
-  setInterval(loadInboxes,   90000);
-  // Slow: heavy tables — only repaints if data changed
-  setInterval(loadCampaigns,    180000);
-  setInterval(loadExperiments,  300000);
+  // ---- Staggered polling — spread across time so no two heavy calls fire together ----
+  // 30s group: offset by 7.5s each so they never coincide
+  setInterval(loadOverview, 30000);
+  setTimeout(() => setInterval(loadPipeline, 30000),  7500);
+  setTimeout(() => setInterval(loadDrafts,   30000), 15000);
+  setTimeout(() => setInterval(loadReplies,  30000), 22500);
+  // 60s group: offset by 10s each
+  setTimeout(() => setInterval(loadHealth,   60000),  5000);
+  setTimeout(() => setInterval(loadSettings, 60000), 35000);
+  // 90s+
+  setTimeout(() => setInterval(loadInboxes,  90000), 45000);
+  // Heavy: spread far apart
+  setTimeout(() => setInterval(loadCampaigns,   180000),  20000);
+  setTimeout(() => setInterval(loadExperiments, 300000),  60000);
+  setTimeout(() => setInterval(loadResearch,    300000), 120000);
   // Very slow: rarely changes
-  setInterval(loadSkipList,  600000);
-  setInterval(loadSequence,  600000);
-  setInterval(loadAssets,    600000);
+  setTimeout(() => setInterval(loadSkipList,  600000), 180000);
+  setTimeout(() => setInterval(loadSequence,  600000), 240000);
+  setTimeout(() => setInterval(loadAssets,    600000), 300000);
 
   // ============================================================
   // CAMPAIGN ASSETS
@@ -2461,32 +2482,7 @@
     };
   }
 
-  // ---- Full manual refresh (used by the refresh button only) ----
-  // Bypasses cache so user gets fresh data on demand
-  refreshAll = async function() {
-    const btn = document.getElementById('refresh-btn');
-    if (btn) btn.classList.add('spinning');
-    document.getElementById('last-refresh-time').textContent = 'Refreshing...';
-
-    await Promise.allSettled([
-      loadOverview(),
-      loadHealth(),
-      loadPipeline(),
-      loadCampaigns(),
-      loadExperiments(),
-      loadReplies(),
-      loadSequence(),
-      loadSkipList(),
-      loadSettings(),
-      loadInboxes(),
-      loadDrafts(),
-      loadAssets(),
-      loadResearch()
-    ]);
-
-    if (btn) btn.classList.remove('spinning');
-    document.getElementById('last-refresh-time').textContent = 'Last refresh: ' + new Date().toLocaleTimeString();
-  };
+  // refreshAll is defined once above — no duplicate needed here
 
   // Start SSE on page load
   initActivitySSE();
@@ -2845,11 +2841,7 @@
       }).join('');
   }
 
-  // Auto-refresh research every 5 minutes (300s)
-  setInterval(loadResearch, 300000);
-
-  // Initial load
-  loadResearch();
+  // loadResearch is included in refreshAll() and the staggered setInterval above
 
 </script>
 </body>
