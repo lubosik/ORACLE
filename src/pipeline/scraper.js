@@ -62,8 +62,19 @@ export async function scrapeLeads(vertical = 'real_estate', geoTarget = null) {
     detail: { actor: process.env.APIFY_ACTOR_ID, vertical, geo: geoLabel }
   });
 
-  const run = await client.actor(process.env.APIFY_ACTOR_ID).call(input);
-  const { items } = await client.dataset(run.defaultDatasetId).listItems();
+  // Retry up to 3 times on Apify timeout/transient failures
+  let run, items;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      run = await client.actor(process.env.APIFY_ACTOR_ID).call(input, { timeoutSecs: 300 });
+      ({ items } = await client.dataset(run.defaultDatasetId).listItems());
+      break; // success
+    } catch (err) {
+      logger.warn(`Apify scrape attempt ${attempt}/3 failed`, { error: err.message });
+      if (attempt === 3) throw err;
+      await new Promise(r => setTimeout(r, attempt * 15000)); // 15s, 30s backoff
+    }
+  }
 
   const allLeads = items.map(item => {
     const rawCount = item.numEmployees || item.employee_count || item.employeeCount ||

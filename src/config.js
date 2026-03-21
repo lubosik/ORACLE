@@ -11,7 +11,7 @@ export const CONFIG = {
           'Managing Partner', 'President', 'Owner'
         ],
         industry: ['Real Estate', 'Commercial Real Estate', 'Property Management'],
-        companyEmployeeSize: ['2 - 10', '11 - 50', '51 - 100', '101 - 500'],
+        companyEmployeeSize: ['2 - 10', '11 - 50', '51 - 200', '201 - 500'],
         personCountry: ['United Kingdom', 'United States'],
         contactEmailStatus: 'verified',
         includeEmails: true

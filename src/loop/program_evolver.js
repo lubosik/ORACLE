@@ -1,6 +1,7 @@
 import { supabase } from '../utils/supabase.js';
 import { logActivity } from '../utils/activity.js';
 import { getCurrentBaseline } from './ledger.js';
+import { getSetting, setSetting } from '../utils/settings.js';
 import Anthropic from '@anthropic-ai/sdk';
 import logger from '../utils/logger.js';
 import { readFile, writeFile } from 'fs/promises';
@@ -38,7 +39,13 @@ export async function evolveProgramIfReady() {
 
     const baseline = await getCurrentBaseline('real_estate');
     const programPath = join(__dirname, '../program.md');
-    const currentProgram = await readFile(programPath, 'utf8');
+
+    // Read from disk first; fall back to Supabase-persisted version (Railway FS is ephemeral)
+    let currentProgram = '';
+    try { currentProgram = await readFile(programPath, 'utf8'); } catch {}
+    if (!currentProgram.trim()) {
+      currentProgram = await getSetting('current_program_md', 'Maximise positive reply rate for AIRO cold email campaigns.');
+    }
 
     const winners = recentExps.filter(e => e.outcome === 'winner');
     const losers = recentExps.filter(e => e.outcome === 'loser');
@@ -92,8 +99,9 @@ Return ONLY valid JSON:
 
     const evolution = JSON.parse(jsonMatch[0]);
 
-    // Write updated program.md
-    await writeFile(programPath, evolution.new_program_md, 'utf8');
+    // Write to disk (fast access) AND Supabase setting (survives Railway redeploys)
+    try { await writeFile(programPath, evolution.new_program_md, 'utf8'); } catch {}
+    await setSetting('current_program_md', evolution.new_program_md);
 
     await supabase.from('program_evolution').insert({
       evolved_at: new Date().toISOString(),

@@ -101,22 +101,53 @@ export async function activateCampaign(campaignId) {
   logger.info('Campaign activated', { campaign_id: campaignId });
 }
 
-export async function registerReplyWebhook() {
-  const webhookUrl = process.env.RAILWAY_PUBLIC_DOMAIN
-    ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}/webhook/reply`
-    : `http://localhost:${process.env.PORT || 3000}/webhook/reply`;
+function getPublicBaseUrl() {
+  if (process.env.RAILWAY_PUBLIC_DOMAIN) return `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`;
+  if (process.env.PUBLIC_URL) return process.env.PUBLIC_URL.replace(/\/$/, '');
+  return `http://localhost:${process.env.PORT || 3000}`;
+}
+
+async function listWebhooks() {
+  try {
+    return await instantlyRequest('/webhook/listwebhook', 'GET');
+  } catch {
+    return [];
+  }
+}
+
+async function ensureWebhook(name, eventType, path) {
+  const base = getPublicBaseUrl();
+  const targetUrl = `${base}${path}`;
+
+  // Check if a webhook for this event already exists to avoid duplicates
+  const existing = await listWebhooks();
+  const alreadyExists = Array.isArray(existing)
+    ? existing.find(w => w.event_type === eventType || w.target_hook_url === targetUrl)
+    : null;
+
+  if (alreadyExists) {
+    logger.info(`Webhook already registered (${eventType})`, { id: alreadyExists.id, url: targetUrl });
+    return alreadyExists;
+  }
 
   try {
     const result = await instantlyRequest('/webhooks', 'POST', {
-      name: 'ORACLE Reply Handler',
-      target_hook_url: webhookUrl,
-      event_type: 'reply_received'
+      name,
+      target_hook_url: targetUrl,
+      event_type: eventType
     });
-    logger.info('Reply webhook registered', { url: webhookUrl, webhook_id: result.id });
+    logger.info(`Webhook registered: ${eventType}`, { url: targetUrl, id: result.id });
     return result;
   } catch (err) {
-    logger.warn('Webhook registration failed (may already exist)', { error: err.message });
+    logger.warn(`Webhook registration failed for ${eventType}`, { error: err.message });
+    return null;
   }
+}
+
+export async function registerWebhooks() {
+  await ensureWebhook('ORACLE Reply Handler',  'reply_received',  '/webhook/reply');
+  await ensureWebhook('ORACLE Bounce Handler', 'email_bounced',   '/webhook/bounce');
+  await ensureWebhook('ORACLE Unsub Handler',  'lead_unsubscribed', '/webhook/unsubscribe');
 }
 
 export async function launchCampaign(leads, variantId = 'v1_baseline') {

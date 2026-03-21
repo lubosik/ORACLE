@@ -346,6 +346,54 @@ Review and choose an action:`;
   }
 });
 
+// Instantly bounce webhook — update campaign_daily_stats bounce counts
+app.post('/webhook/bounce', async (req, res) => {
+  res.sendStatus(200);
+  const payload = req.body;
+  const campaignId = payload.campaign_id || payload.campaignId || '';
+  const email = payload.lead_email || payload.email || '';
+  if (!campaignId) return;
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    await supabase.rpc('increment_bounce', { p_campaign_id: campaignId, p_date: today })
+      .catch(async () => {
+        // Fallback if RPC not available: upsert row and increment manually
+        const { data: existing } = await supabase
+          .from('campaign_daily_stats')
+          .select('bounced')
+          .eq('campaign_id', campaignId)
+          .eq('date', today)
+          .maybeSingle();
+        if (existing) {
+          await supabase.from('campaign_daily_stats')
+            .update({ bounced: (existing.bounced || 0) + 1 })
+            .eq('campaign_id', campaignId).eq('date', today);
+        } else {
+          await supabase.from('campaign_daily_stats')
+            .insert({ campaign_id: campaignId, date: today, bounced: 1, emails_sent: 0, replies_unique: 0, auto_replies_unique: 0, opens_unique: 0 });
+        }
+      });
+    logger.info('Bounce recorded', { campaign_id: campaignId, email });
+  } catch (err) {
+    logger.error('Bounce webhook error', { error: err.message });
+  }
+});
+
+// Instantly unsubscribe webhook — mark lead as opted out in seen_leads
+app.post('/webhook/unsubscribe', async (req, res) => {
+  res.sendStatus(200);
+  const payload = req.body;
+  const email = (payload.lead_email || payload.email || '').toLowerCase().trim();
+  if (!email) return;
+  try {
+    await supabase.from('seen_leads').update({ email_unsubscribed: true }).eq('email', email);
+    logger.info('Unsubscribe recorded', { email });
+    await logActivity({ category: 'campaign', level: 'info', message: `Unsubscribe: ${email}`, lead_email: email });
+  } catch (err) {
+    logger.error('Unsubscribe webhook error', { error: err.message });
+  }
+});
+
 // Engine on/off state
 app.get('/api/engine/state', (req, res) => {
   res.json(getEngineState());
@@ -701,6 +749,8 @@ app.get('/api/research/program', async (req, res) => {
     const dir = dn(fileURLToPath(import.meta.url));
     let current = '';
     try { current = await readFile(pjoin(dir, '../program.md'), 'utf8'); } catch {}
+    // Fall back to Supabase-persisted version if disk file is empty (ephemeral Railway FS)
+    if (!current.trim()) current = await getSetting('current_program_md', '');
     res.json({ current_program: current, evolution_history: data || [] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

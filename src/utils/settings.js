@@ -20,27 +20,12 @@ export async function getSetting(key, fallback = null) {
 export async function setSetting(key, value) {
   const strVal = String(value);
 
-  // Check if row already exists
-  const { data: existing, error: selectErr } = await supabase
+  // Atomic upsert — eliminates select+insert/update race condition
+  const { error } = await supabase
     .from('system_settings')
-    .select('key')
-    .eq('key', key)
-    .maybeSingle();
+    .upsert({ key, value: strVal }, { onConflict: 'key' });
 
-  if (selectErr) throw new Error(`setSetting select failed: ${selectErr.message}`);
-
-  if (existing) {
-    const { error } = await supabase
-      .from('system_settings')
-      .update({ value: strVal })
-      .eq('key', key);
-    if (error) throw new Error(`setSetting update failed: ${error.message}`);
-  } else {
-    const { error } = await supabase
-      .from('system_settings')
-      .insert({ key, value: strVal });
-    if (error) throw new Error(`setSetting insert failed: ${error.message}`);
-  }
+  if (error) throw new Error(`setSetting failed for "${key}": ${error.message}`);
 
   // Always update cache immediately
   settingsCache[key] = strVal;

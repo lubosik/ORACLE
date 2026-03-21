@@ -28,10 +28,21 @@ import { monitorDeliverability } from './src/loop/deliverability_monitor.js';
 import { analyzeCohorts } from './src/loop/cohort_analyzer.js';
 import { proposeVerticalExpansion } from './src/loop/vertical_researcher.js';
 import { checkForEarlyAbort } from './src/loop/early_abort.js';
+import { registerWebhooks } from './src/pipeline/launcher.js';
 
 // Dashboard and Telegram always run regardless of engine state
 startDashboard();
 startTelegramBot();
+
+// Register Instantly webhooks on startup (idempotent — skips if already registered)
+setTimeout(async () => {
+  try {
+    await registerWebhooks();
+    logger.info('Instantly webhooks verified/registered');
+  } catch (err) {
+    logger.warn('Webhook registration on startup failed', { error: err.message });
+  }
+}, 5000); // 5s delay to let server fully start
 
 // Main pipeline: nightly at 01:00 UTC
 cron.schedule('0 1 * * *', async () => {

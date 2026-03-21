@@ -6,6 +6,23 @@ const activityBuffer = [];
 const MAX_BUFFER = 500;
 const sseClients = new Set();
 
+// Seed buffer from Supabase on startup so dashboard shows history after restarts/deploys
+(async () => {
+  try {
+    const { data } = await supabase
+      .from('activity_feed')
+      .select('*')
+      .order('timestamp', { ascending: false })
+      .limit(MAX_BUFFER);
+    if (data?.length) {
+      activityBuffer.push(...data);
+      logger.info(`Activity buffer seeded with ${data.length} entries from Supabase`);
+    }
+  } catch (err) {
+    logger.warn('Could not seed activity buffer from Supabase', { error: err.message });
+  }
+})();
+
 export async function logActivity({
   category,
   level = 'info',

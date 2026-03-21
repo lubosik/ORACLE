@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { getSetting } from '../utils/settings.js';
 import logger from '../utils/logger.js';
 import { readFile } from 'fs/promises';
 import { fileURLToPath } from 'url';
@@ -82,10 +83,10 @@ function buildIntelligenceSection(intelligence) {
 
 export async function generateHypothesis(ledgerEntries, currentBaseline, timingInsights = null, currentSchedule = null, intelligence = null) {
   let programMd = '';
-  try {
-    programMd = await readFile(join(__dirname, '../program.md'), 'utf8');
-  } catch {
-    programMd = 'Maximise positive reply rate for AIRO cold email campaigns.';
+  try { programMd = await readFile(join(__dirname, '../program.md'), 'utf8'); } catch {}
+  // Fall back to Supabase-persisted version if disk file is missing (Railway FS is ephemeral)
+  if (!programMd.trim()) {
+    programMd = await getSetting('current_program_md', 'Maximise positive reply rate for AIRO cold email campaigns.');
   }
 
   const ledgerSummary = ledgerEntries.length
