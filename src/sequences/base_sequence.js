@@ -1,84 +1,83 @@
 export const BASE_SEQUENCE = {
-  variant_id: 'v1_baseline',
+  variant_id: 'v2_refined',
   vertical: 'real_estate',
   product: 'AIRO',
-  version: 1,
+  version: 2,
   positive_reply_rate: null,
   emails: [
     {
       step: 1,
       delay_days: 0,
       subject: '{{firstName}}',
-      body: `Hey {{firstName}},
+      body: `{{personalization}}
 
-Bit of an unusual one.
+Most inbound leads go cold before anyone picks up the phone. So we built something that calls every enquiry back within 60 seconds, qualifies them on the call, and only passes serious buyers to your team. It also works the other way, reviving the dead leads already sitting in your CRM that no one has followed up on.
 
-{{PERSONALISATION_HOOK}}
+One client got 2.5 years of follow-up work done in 14 months with a single agent.
 
-We have got a system that called back over 30,000 inbound enquiries within 60 seconds of someone raising their hand. No human in the loop. Qualifies them on the call. Only passes the serious ones to the team. One client ran it for 14 months and the system handled the equivalent of two and a half years of manual follow-up.
+Want me to send over the specifics?
 
-Would you be open to seeing what that looks like for {{companyName}}? If yes, I will send over the specifics.
-
-Lubosi`
+{{sendingAccountFirstName}}`
     },
     {
       step: 2,
       delay_days: 3,
-      subject: 'had to send this over',
-      body: `Hey {{firstName}},
+      subject: 'two calls',
+      body: `{{firstName}},
 
-Was looking at what {{companyName}} is doing with {{INBOUND_SOURCE}} and genuinely just had to reach back out.
+Two calls AIRO handled. Worth 90 seconds.
 
-Two live call recordings below. Real enquiries, handled by AIRO with no human on the line. Worth 90 seconds before you decide anything.
+The first is a buyer ready to make a wire transfer on the call. The second is a prospect who pushed back thinking they were speaking to AI.
 
-https://airo.velto.ai/audio/wire-transfer.mp3
-https://airo.velto.ai/audio/not-ai.mp3
+Both are real. No script.
 
-The reason I thought of you specifically: most property teams lose deals in the first five minutes after someone enquires. Not because the lead was bad. Because no one got there fast enough. The average team follows up in 4 to 8 hours. AIRO does it in under 60 seconds.
+Recording 1: https://airo.velto.ai/audio/wire-transfer.mp3
+Recording 2: https://airo.velto.ai/audio/not-ai.mp3
 
-We built this for a land development firm in the Cayman Islands, for Idris Elba's creative operation, and for Data Monsters, an elite NVIDIA partner. Different industries, same gap.
+If this is something worth exploring for {{companyName}}, just reply and I will send over the specifics.
 
-Still a yes from you and I will send over exactly how this would work for {{companyName}}.
-
-Lubosi`
+{{sendingAccountFirstName}}`
     },
     {
       step: 3,
       delay_days: 4,
-      subject: 'what 30,000 sales calls taught us',
-      body: `Hey {{firstName}},
+      subject: 'the 391% stat',
+      body: `{{firstName}},
 
-We have processed over 30,000 calls through AIRO. Not demos. Real inbound enquiries, across real pipelines, from people who raised their hand.
+Reaching out within 60 seconds of an enquiry boosts conversion by 391% compared to following up after five minutes.
 
-Here is what that volume teaches you.
+Most teams follow up in hours. Some in days. By then the lead has moved on, replied to a competitor, or simply gone cold.
 
-The teams converting at the highest rate are not the ones with the best closers. They are the ones who got to the lead first. Reaching out within 60 seconds of an enquiry boosts conversion by 391% compared to following up after five minutes. That gap compounds fast.
+The teams converting at the highest rate are not the ones with the best closers. They are the ones who got there first.
 
-Here is how it usually shows up for property teams: leads going cold in the database. High volume, low conversion. Sales team chasing no-shows instead of closing. Morale drops because they are spending energy on people who have already moved on.
+AIRO does exactly that. It calls every enquiry within 60 seconds, qualifies them on the call, and only passes serious buyers to your team.
 
-Those are all symptoms of one thing. Speed to lead.
+Worth exploring what that looks like for {{companyName}}?
 
-AIRO solves every single one of them. It calls the moment someone enquires, qualifies them on that call, and your team only picks up the phone when there is a real buyer on the other end.
-
-Worth a quick conversation to see how this would work at {{companyName}}?
-
-Lubosi`
+{{sendingAccountFirstName}}`
     },
     {
       step: 4,
       delay_days: 6,
-      subject: 'one thing before I close this',
-      body: `Hey {{firstName}},
+      subject: 'our clients',
+      body: `{{firstName}},
 
-Last one from me on this, I promise.
+We ran AIRO for a land development firm in the Cayman Islands, Idris Elba's creative operation, and Data Monsters, an elite NVIDIA partner.
 
-If {{companyName}} ever has inbound coming in from ads, a landing page, portals, or anywhere else and the team is not getting to those enquiries fast enough, AIRO is probably worth 20 minutes of your time.
+Three completely different businesses. All had the same problem. Strong inbound, leads going cold before anyone got to them. AIRO called every enquiry within 60 seconds, qualified them on the call, and cut out the dead follow-up entirely.
 
-60 second callback. Autonomous qualification. Your team only picks up when there is a serious buyer. The property teams using it have stopped chasing leads entirely.
+If that sounds familiar at {{companyName}}, just reply yes and I will send over the specifics.
 
-Just a yes or no is fine.
-
-Lubosi`
+{{sendingAccountFirstName}}`
     }
   ]
 };
+
+// Console log for manual review before next pipeline run
+console.log('\n=== BASE_SEQUENCE v2_refined — FULL BODIES FOR REVIEW ===\n');
+BASE_SEQUENCE.emails.forEach(e => {
+  console.log(`--- EMAIL ${e.step} (delay: ${e.delay_days}d) ---`);
+  console.log(`Subject: ${e.subject}`);
+  console.log(`Body:\n${e.body}`);
+  console.log('');
+});

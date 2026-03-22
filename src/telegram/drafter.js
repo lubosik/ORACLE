@@ -1,9 +1,7 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { callAI } from '../utils/ai_client.js';
 import { buildAssetLibraryPrompt } from '../utils/assets.js';
 import logger from '../utils/logger.js';
 import 'dotenv/config';
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || "missing-key" });
 
 function buildSystemPrompt(assetLibrary, emailStep) {
   const stepNote = emailStep
@@ -35,7 +33,7 @@ RULES:
 - Peer to peer tone. Confident, warm, direct.
 - No em dashes. No "just following up". No "I hope this finds you well". No filler.
 - Use real URLs exactly as given in the asset library. Never shorten or fabricate them.
-- Always sign off as Lubosi.
+- Always sign off as {{sendingAccountFirstName}}.
 
 Return only the reply body as plain text. No subject line. No labels. No preamble.`;
 }
@@ -47,9 +45,7 @@ export async function draftReply(replyPayload) {
     const assetLibrary = await buildAssetLibraryPrompt();
     const systemPrompt = buildSystemPrompt(assetLibrary, email_step);
 
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 600,
+    const draft = (await callAI({
       system: systemPrompt,
       messages: [{
         role: 'user',
@@ -57,11 +53,10 @@ export async function draftReply(replyPayload) {
 
 "${reply_body}"
 
-Draft the reply. Sign off as Lubosi.`
-      }]
-    });
-
-    const draft = message.content[0].text
+Draft the reply. Sign off as {{sendingAccountFirstName}}.`
+      }],
+      maxTokens: 600
+    }))
       .replace(/\u2014/g, ',')
       .replace(/\u2013/g, '-');
 

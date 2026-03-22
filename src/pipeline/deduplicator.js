@@ -1,5 +1,6 @@
 import { supabase } from '../utils/supabase.js';
 import { isSkippedDomain } from '../utils/skip-list.js';
+import { logActivity } from '../utils/activity.js';
 import logger from '../utils/logger.js';
 
 const COOLDOWN_DAYS = 30;
@@ -28,6 +29,23 @@ export async function isDuplicate(email) {
 }
 
 export async function filterNewLeads(leads) {
+  // Diagnostic: count leads currently in 30-day cooldown window
+  try {
+    const { count: blockedCount } = await supabase
+      .from('seen_leads')
+      .select('*', { count: 'exact', head: true })
+      .not('last_campaigned_at', 'is', null)
+      .gte('last_campaigned_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
+
+    await logActivity({
+      category: 'pipeline',
+      level: 'info',
+      message: `Deduplicator: ${blockedCount ?? 'unknown'} leads currently in 30-day cooldown window`
+    });
+  } catch (err) {
+    logger.warn('Could not fetch cooldown count', { error: err.message });
+  }
+
   const results = { passed: [], skipped: 0, skip_listed: 0 };
 
   for (const lead of leads) {

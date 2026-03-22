@@ -1,12 +1,11 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { callAI } from '../utils/ai_client.js';
+import { getRecentExperimentsWithCopy, formatCopyForPrompt } from './ledger.js';
 import { getSetting } from '../utils/settings.js';
 import logger from '../utils/logger.js';
 import { readFile } from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import 'dotenv/config';
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || "missing-key" });
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -90,9 +89,11 @@ export async function generateHypothesis(ledgerEntries, currentBaseline, timingI
   }
 
   const ledgerSummary = ledgerEntries.length
-    ? ledgerEntries.map(e =>
-        `- ${e.variant_id} [${e.change_type || 'copy'}]: ${e.what_changed} | rate: ${e.positive_reply_rate != null ? (e.positive_reply_rate * 100).toFixed(2) + '%' : 'pending'} | outcome: ${e.outcome}`
-      ).join('\n')
+    ? ledgerEntries.map(e => {
+        const rate = e.positive_reply_rate != null ? (e.positive_reply_rate * 100).toFixed(2) + '%' : 'pending';
+        const copy = formatCopyForPrompt(e.sequence_snapshot, { bodyChars: 180 });
+        return `- ${e.variant_id} [${e.change_type || 'copy'}]: ${e.what_changed} | rate: ${rate} | outcome: ${e.outcome}\n${copy}`;
+      }).join('\n\n')
     : 'No experiments yet. This is the first hypothesis.';
 
   const baselineRate = currentBaseline?.positive_reply_rate
@@ -102,9 +103,7 @@ export async function generateHypothesis(ledgerEntries, currentBaseline, timingI
   const timingSection = buildTimingSection(timingInsights, currentSchedule);
   const intelligenceSection = buildIntelligenceSection(intelligence);
 
-  const message = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 900,
+  const content = await callAI({
     messages: [{
       role: 'user',
       content: `You are running Karpathy-style self-improvement experiments on cold email campaigns for AIRO.
@@ -141,10 +140,10 @@ For schedule_changes (only when change_type is send_schedule), use:
   "dailyLimit": 50,
   "rationale": "why this schedule should outperform"
 }`
-    }]
+    }],
+    maxTokens: 900
   });
 
-  const content = message.content[0].text;
   const jsonMatch = content.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error('No JSON in hypothesis response');
 

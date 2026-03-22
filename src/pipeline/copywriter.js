@@ -1,10 +1,9 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { callAI } from '../utils/ai_client.js';
 import logger from '../utils/logger.js';
 import { supabase } from '../utils/supabase.js';
-import { getEmail2Assets, buildAssetLibraryPrompt } from '../utils/assets.js';
+import { getEmail2Assets } from '../utils/assets.js';
+import { BASE_SEQUENCE } from '../sequences/base_sequence.js';
 import 'dotenv/config';
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || "missing-key" });
 
 const EM_DASH = '\u2014';
 const EN_DASH = '\u2013';
@@ -58,6 +57,102 @@ Return ONLY valid JSON, no preamble, no markdown, no explanation:
   "email_4": { "subject": "...", "body": "..." }
 }`;
 
+const TEMPLATE_SYSTEM_PROMPT = `You are writing cold email sequence TEMPLATES for AIRO — an AI voice agent that calls inbound leads within 60 seconds of them enquiring, qualifies them autonomously, and only passes serious buyers to the sales team.
+
+CRITICAL — you are writing a TEMPLATE, not a personalised email. Use these exact Instantly merge tags wherever appropriate:
+- {{firstName}} — recipient's first name (use in greeting and subject)
+- {{companyName}} — recipient's company name (use when referencing their business)
+- {{personalization}} — a specific, researched observation about their business (use in email 1 opener)
+- {{sendingAccountFirstName}} — sender's first name (use as the sign-off on every email)
+
+NON-NEGOTIABLE RULES:
+- NO em dashes anywhere in any email
+- NO "just following up", "I wanted to reach out", "I hope this finds you well", "quick question"
+- NO bullet points in emails 1, 2, or 4
+- Subject lines: lowercase, under 5 words, plausible deniability
+- Paragraphs: 1 to 2 sentences maximum
+- Tone: peer to peer, never vendor to prospect
+- CTA is always reply-based: "If yes, I will send over the specifics" or similar soft ask
+- Sign off as {{sendingAccountFirstName}} on every email
+- Email 2 must include [VOICE RECORDING 1] and [VOICE RECORDING 2] as placeholders — they will be swapped for real URLs
+
+Return ONLY valid JSON, no preamble, no markdown:
+{
+  "email_1": { "subject": "...", "body": "..." },
+  "email_2": { "subject": "...", "body": "..." },
+  "email_3": { "subject": "...", "body": "..." },
+  "email_4": { "subject": "...", "body": "..." }
+}`;
+
+/**
+ * Generate ONE sequence template per campaign.
+ * For baseline runs: returns BASE_SEQUENCE formatted as a snapshot.
+ * For experiment variants: applies hypothesis instructions on top of the baseline.
+ * Uses Instantly merge tags throughout — no literal lead data.
+ */
+export async function generateSequenceTemplate(variantId = 'v1_baseline', hypothesisInstructions = null) {
+  // Load voice recordings to embed real URLs in template
+  const voiceRecordings = await getEmail2Assets();
+  const rec1 = voiceRecordings[0]?.url || 'https://airo.velto.ai/audio/wire-transfer.mp3';
+  const rec2 = voiceRecordings[1]?.url || 'https://airo.velto.ai/audio/not-ai.mp3';
+
+  // Baseline: return BASE_SEQUENCE directly (no AI call needed)
+  if (!hypothesisInstructions) {
+    const seq = BASE_SEQUENCE.emails;
+    return {
+      email_1: { subject: seq[0].subject, body: seq[0].body },
+      email_2: { subject: seq[1].subject, body: seq[1].body.replace('[VOICE RECORDING 1]', rec1).replace('[VOICE RECORDING 2]', rec2) },
+      email_3: { subject: seq[2].subject, body: seq[2].body },
+      email_4: { subject: seq[3].subject, body: seq[3].body }
+    };
+  }
+
+  // Experiment variant: ask AI to modify the baseline per hypothesis instructions
+  const seq = BASE_SEQUENCE.emails;
+  const baselineBlock = seq.map((e, i) => `EMAIL ${i + 1}\nSubject: ${e.subject}\nBody:\n${e.body}`).join('\n\n---\n\n');
+
+  try {
+    const content = await callAI({
+      system: TEMPLATE_SYSTEM_PROMPT,
+      messages: [{
+        role: 'user',
+        content: `CURRENT BASELINE SEQUENCE:\n\n${baselineBlock}\n\n---\n\nEXPERIMENT INSTRUCTIONS:\n${hypothesisInstructions}\n\nApply ONLY the changes described above. Keep everything else identical to the baseline. Maintain all merge tags ({{firstName}}, {{companyName}}, {{personalization}}, {{inbound_source}}). Email 2 must include [VOICE RECORDING 1] and [VOICE RECORDING 2] placeholders.\n\nReturn the complete 4-email sequence as JSON.`
+      }],
+      maxTokens: 2000
+    });
+
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('No JSON in template response');
+
+    const parsed = JSON.parse(jsonMatch[0]);
+
+    const template = {
+      email_1: { subject: sanitiseCopy(parsed.email_1.subject), body: sanitiseCopy(parsed.email_1.body) },
+      email_2: {
+        subject: sanitiseCopy(parsed.email_2.subject),
+        body: sanitiseCopy(parsed.email_2.body)
+          .replace('[VOICE RECORDING 1]', rec1)
+          .replace('[VOICE RECORDING 2]', rec2)
+      },
+      email_3: { subject: sanitiseCopy(parsed.email_3.subject), body: sanitiseCopy(parsed.email_3.body) },
+      email_4: { subject: sanitiseCopy(parsed.email_4.subject), body: sanitiseCopy(parsed.email_4.body) }
+    };
+
+    logger.info('Sequence template generated for variant', { variantId, hypothesisInstructions: hypothesisInstructions.slice(0, 80) });
+    return template;
+
+  } catch (err) {
+    logger.error('Template generation failed, falling back to BASE_SEQUENCE', { variantId, error: err.message });
+    // Fall back to baseline so the campaign still launches
+    return {
+      email_1: { subject: seq[0].subject, body: seq[0].body },
+      email_2: { subject: seq[1].subject, body: seq[1].body.replace('[VOICE RECORDING 1]', rec1).replace('[VOICE RECORDING 2]', rec2) },
+      email_3: { subject: seq[2].subject, body: seq[2].body },
+      email_4: { subject: seq[3].subject, body: seq[3].body }
+    };
+  }
+}
+
 export async function generateCopy(lead, variantId = 'v1_baseline') {
   const { firstName, companyName, title, enrichment } = lead;
   const inbound_source = enrichment?.inbound_source || 'their inbound pipeline';
@@ -78,16 +173,11 @@ Email 4 rules: subject = closing signal. Under 60 words. Dead simple CTA: "Just 
 CRITICAL: No em dashes anywhere. No "just following up" anywhere.`;
 
   try {
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 2000,
-      messages: [
-        { role: 'user', content: userPrompt }
-      ],
-      system: SYSTEM_PROMPT
+    const content = await callAI({
+      system: SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: userPrompt }],
+      maxTokens: 2000
     });
-
-    const content = message.content[0].text;
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error('No JSON found in Claude response');
 
@@ -125,8 +215,7 @@ CRITICAL: No em dashes anywhere. No "just following up" anywhere.`;
 }
 
 export async function generateCopyBatch(leads, variantId = 'v1_baseline') {
-  const results = [];
-  let count = 0;
+  const CONCURRENCY = 5;
 
   // Load voice recordings once for the whole batch
   const voiceRecordings = await getEmail2Assets();
@@ -140,26 +229,43 @@ export async function generateCopyBatch(leads, variantId = 'v1_baseline') {
     });
   }
 
-  for (const lead of leads) {
-    try {
-      const copy = await generateCopy(lead, variantId);
+  const results = [];
+  let count = 0;
 
-      // Replace placeholders in Email 2 with real URLs
-      if (rec1) copy.email_2_body = copy.email_2_body.replace('[VOICE RECORDING 1]', rec1);
-      if (rec2) copy.email_2_body = copy.email_2_body.replace('[VOICE RECORDING 2]', rec2);
-      // Also update Supabase with resolved URLs
-      if (rec1 || rec2) {
-        await supabase.from('lead_copy')
-          .update({ email_2_body: copy.email_2_body })
-          .eq('email', lead.email);
+  // Process in parallel chunks of CONCURRENCY
+  for (let i = 0; i < leads.length; i += CONCURRENCY) {
+    const chunk = leads.slice(i, i + CONCURRENCY);
+
+    const chunkResults = await Promise.all(chunk.map(async lead => {
+      try {
+        const copy = await generateCopy(lead, variantId);
+
+        // Replace placeholders in Email 2 with real URLs
+        if (rec1) copy.email_2_body = copy.email_2_body.replace('[VOICE RECORDING 1]', rec1);
+        if (rec2) copy.email_2_body = copy.email_2_body.replace('[VOICE RECORDING 2]', rec2);
+        if (rec1 || rec2) {
+          await supabase.from('lead_copy')
+            .update({ email_2_body: copy.email_2_body })
+            .eq('email', lead.email);
+        }
+
+        return { ...lead, copy };
+      } catch (err) {
+        logger.error('Skipping lead due to copy error', { email: lead.email, error: err.message });
+        return null;
       }
+    }));
 
-      results.push({ ...lead, copy });
-      count++;
-    } catch (err) {
-      logger.error('Skipping lead due to copy error', { email: lead.email, error: err.message });
+    const passed = chunkResults.filter(r => r !== null);
+    results.push(...passed);
+    count += passed.length;
+
+    logger.info(`Copy generation progress: ${count}/${leads.length}`, { chunk_start: i, chunk_size: chunk.length });
+
+    // Brief pause between chunks to avoid rate limits
+    if (i + CONCURRENCY < leads.length) {
+      await new Promise(r => setTimeout(r, 1000));
     }
-    await new Promise(r => setTimeout(r, 1000));
   }
 
   logger.info('Copy generation batch complete', { generated: count, total: leads.length });

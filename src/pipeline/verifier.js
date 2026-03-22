@@ -1,70 +1,45 @@
 import logger from '../utils/logger.js';
 import { supabase } from '../utils/supabase.js';
+import { logActivity } from '../utils/activity.js';
 import 'dotenv/config';
 
-const BASE_URL = process.env.INSTANTLY_BASE_URL || 'https://api.instantly.ai/api/v2';
-
-async function pollVerification(email, maxAttempts = 3) {
-  for (let i = 0; i < maxAttempts; i++) {
-    await new Promise(r => setTimeout(r, 5000));
-    try {
-      const res = await fetch(`${BASE_URL}/email-verification/${encodeURIComponent(email)}`, {
-        headers: { 'Authorization': `Bearer ${process.env.INSTANTLY_API_KEY}` }
-      });
-      const data = await res.json();
-      if (data.verification_status !== 'pending') return data;
-    } catch (err) {
-      logger.warn('Poll verification error', { email, attempt: i + 1, error: err.message });
-    }
-  }
-  return null;
-}
+const MV_API_KEY = process.env.MILLION_VERIFIER_API_KEY;
+const MV_BASE_URL = 'https://api.millionverifier.com/api/v3/';
 
 export async function verifyEmail(email) {
   try {
-    const res = await fetch(`${BASE_URL}/email-verification`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.INSTANTLY_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ email })
-    });
+    const url = `${MV_BASE_URL}?api=${MV_API_KEY}&email=${encodeURIComponent(email)}&timeout=10`;
+    const res = await fetch(url);
 
     if (!res.ok) {
-      throw new Error(`Verification API error: ${res.status}`);
+      throw new Error(`MillionVerifier API error: ${res.status}`);
     }
 
-    let result = await res.json();
+    const data = await res.json();
 
-    if (result.verification_status === 'pending') {
-      result = await pollVerification(email) || result;
-    }
-
-    const passed = result.verification_status === 'verified' ||
-                   (result.verification_status === 'valid');
-
-    const failed = result.verification_status === 'invalid' ||
-                   result.verification_status === 'error' ||
-                   result.verification_status === 'pending';
+    // Only skip if explicitly invalid — catch_all, unknown, risky etc. are all fine to send
+    const passed = data.result !== 'invalid';
 
     await supabase.from('lead_verification').upsert({
       email,
-      verification_status: result.verification_status,
-      catch_all: result.catch_all === true,
+      verification_status: data.result,
+      sub_result: data.subresult || null,
+      catch_all: data.result === 'catch_all',
       verified_at: new Date().toISOString()
     }, { onConflict: 'email' });
 
     return {
       email,
-      passed: passed && !failed,
-      status: result.verification_status,
-      catch_all: result.catch_all
+      passed,
+      status: data.result,
+      subresult: data.subresult,
+      catch_all: data.result === 'catch_all'
     };
 
   } catch (err) {
     logger.error('Email verification error', { email, error: err.message });
-    return { email, passed: false, status: 'error', catch_all: false };
+    // On API error, pass the lead through rather than silently dropping it
+    return { email, passed: true, status: 'error', catch_all: false };
   }
 }
 
@@ -78,10 +53,18 @@ export async function verifyLeads(leads) {
       verified.push(lead);
     } else {
       failCount++;
-      logger.debug('Lead failed verification', { email: lead.email, status: result.status });
+      logger.debug('Lead failed verification — invalid email', { email: lead.email, subresult: result.subresult });
     }
+    // MillionVerifier is fast — 200ms gap is enough
     await new Promise(r => setTimeout(r, 200));
   }
+
+  await logActivity({
+    category: 'verification',
+    level: 'info',
+    message: `Verification complete — ${verified.length} passed, ${failCount} invalid (dropped)`,
+    detail: { passed: verified.length, failed: failCount }
+  });
 
   logger.info('Verification complete', { passed: verified.length, failed: failCount });
   return { verified, failCount };
