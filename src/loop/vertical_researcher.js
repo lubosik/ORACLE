@@ -1,10 +1,8 @@
 import { supabase } from '../utils/supabase.js';
 import { getCurrentBaseline } from './ledger.js';
 import { logActivity } from '../utils/activity.js';
-import Anthropic from '@anthropic-ai/sdk';
+import { callAI } from '../utils/ai_client.js';
 import logger from '../utils/logger.js';
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || "missing-key" });
 const PROPOSE_AFTER_EXPERIMENTS = 15;
 const MAX_PENDING_PROPOSALS = 3;
 
@@ -42,9 +40,7 @@ export async function proposeVerticalExpansion() {
       .order('positive_reply_rate', { ascending: false })
       .limit(5);
 
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 800,
+    const vertRaw = await callAI({
       messages: [{
         role: 'user',
         content: `ORACLE is an autonomous cold email engine for AIRO — an AI voice assistant that handles inbound sales calls for businesses with high inbound call volume.
@@ -74,10 +70,11 @@ Return ONLY valid JSON array:
     "apify_countries": ["United Kingdom", "United States"]
   }
 ]`
-      }]
+      }],
+      maxTokens: 800
     });
 
-    const jsonMatch = message.content[0].text.match(/\[[\s\S]*\]/);
+    const jsonMatch = vertRaw.match(/\[[\s\S]*\]/);
     if (!jsonMatch) return null;
 
     const proposals = JSON.parse(jsonMatch[0]);

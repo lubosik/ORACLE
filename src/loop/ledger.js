@@ -16,6 +16,51 @@ export async function getRecentExperiments(limit = 10) {
   return data || [];
 }
 
+/**
+ * Returns recent experiments enriched with their actual email copy from campaign_drafts.
+ * Uses variant_id as the join key.
+ */
+export async function getRecentExperimentsWithCopy(limit = 10) {
+  const experiments = await getRecentExperiments(limit);
+  if (!experiments.length) return experiments;
+
+  const variantIds = [...new Set(experiments.map(e => e.variant_id).filter(Boolean))];
+
+  const { data: drafts } = await supabase
+    .from('campaign_drafts')
+    .select('variant_id, sequence_snapshot')
+    .in('variant_id', variantIds);
+
+  const copyByVariant = {};
+  for (const d of drafts || []) {
+    if (d.variant_id && d.sequence_snapshot) {
+      copyByVariant[d.variant_id] = d.sequence_snapshot;
+    }
+  }
+
+  return experiments.map(e => ({
+    ...e,
+    sequence_snapshot: copyByVariant[e.variant_id] || null
+  }));
+}
+
+/**
+ * Formats a sequence_snapshot into a compact copy block for AI prompts.
+ * Includes all 4 subject lines and truncated bodies.
+ */
+export function formatCopyForPrompt(seq, { bodyChars = 200 } = {}) {
+  if (!seq) return '  [No copy snapshot available]';
+  const lines = [];
+  for (let i = 1; i <= 4; i++) {
+    const email = seq[`email_${i}`];
+    if (!email) continue;
+    const body = (email.body || '').replace(/\s+/g, ' ').trim();
+    lines.push(`  Email ${i} subject: "${email.subject}"`);
+    lines.push(`  Email ${i} body: "${body.slice(0, bodyChars)}${body.length > bodyChars ? '...' : ''}"`);
+  }
+  return lines.join('\n');
+}
+
 export async function getCurrentBaseline(vertical = 'real_estate') {
   const { data, error } = await supabase
     .from('baselines')

@@ -1,5 +1,7 @@
 import { supabase } from '../utils/supabase.js';
 import { logActivity } from '../utils/activity.js';
+import { BASE_SEQUENCE } from '../sequences/base_sequence.js';
+import { generateSequenceTemplate } from './copywriter.js';
 
 export async function createCampaignDraft({
   pipelineRunId,
@@ -10,7 +12,8 @@ export async function createCampaignDraft({
   selectedInboxes,
   minLeads,
   maxLeads,
-  geoContext = null
+  geoContext = null,
+  copyInstructions = null
 }) {
   if (leads.length < minLeads) {
     await logActivity({
@@ -26,23 +29,36 @@ export async function createCampaignDraft({
 
   const leadsSnapshot = cappedLeads.map(l => ({
     email: l.email,
+    emailType: l.emailType,
     firstName: l.firstName,
     lastName: l.lastName,
-    companyName: l.companyName,
     title: l.title,
-    personalisation_hook: l.enrichment?.personalisation_hook,
-    inbound_source: l.enrichment?.inbound_source
+    companyName: l.companyName,
+    companyWebsite: l.companyWebsite,
+    linkedinUrl: l.linkedinUrl,
+    city: l.city,
+    state: l.state,
+    country: l.country,
+    personalisation_hook: l.enrichment?.personalisation_hook || '',
+    inbound_source: l.enrichment?.inbound_source || ''
   }));
 
-  // Build sequence snapshot from leads' copy (each lead has personalised copy)
-  // Use the first lead's copy as the sequence template for the draft preview
-  const firstCopy = cappedLeads[0]?.copy;
-  const sequenceSnapshot = {
-    email_1: { subject: firstCopy?.email_1_subject || sequence?.emails?.[0]?.subject || '', body: firstCopy?.email_1_body || sequence?.emails?.[0]?.body || '' },
-    email_2: { subject: firstCopy?.email_2_subject || sequence?.emails?.[1]?.subject || '', body: firstCopy?.email_2_body || sequence?.emails?.[1]?.body || '' },
-    email_3: { subject: firstCopy?.email_3_subject || sequence?.emails?.[2]?.subject || '', body: firstCopy?.email_3_body || sequence?.emails?.[2]?.body || '' },
-    email_4: { subject: firstCopy?.email_4_subject || sequence?.emails?.[3]?.subject || '', body: firstCopy?.email_4_body || sequence?.emails?.[3]?.body || '' }
-  };
+  // Generate the sequence template for this campaign.
+  // - Experiment variants: AI applies hypothesis instructions on top of BASE_SEQUENCE (one AI call)
+  // - Baseline runs: BASE_SEQUENCE returned directly (no AI call)
+  // All templates use Instantly merge tags so every lead gets personalised copy.
+  let sequenceSnapshot;
+  if (sequence) {
+    // Explicit sequence passed in (e.g. from a future custom flow)
+    sequenceSnapshot = {
+      email_1: { subject: sequence.emails[0].subject, body: sequence.emails[0].body },
+      email_2: { subject: sequence.emails[1].subject, body: sequence.emails[1].body },
+      email_3: { subject: sequence.emails[2].subject, body: sequence.emails[2].body },
+      email_4: { subject: sequence.emails[3].subject, body: sequence.emails[3].body }
+    };
+  } else {
+    sequenceSnapshot = await generateSequenceTemplate(variantId, copyInstructions || null);
+  }
 
   const { data: draft, error } = await supabase
     .from('campaign_drafts')

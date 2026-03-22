@@ -7,13 +7,13 @@ import 'dotenv/config';
 const BASE_URL = process.env.INSTANTLY_BASE_URL || 'https://api.instantly.ai/api/v2';
 
 async function instantlyRequest(path, method = 'GET', body = null) {
+  const headers = { 'Authorization': `Bearer ${process.env.INSTANTLY_API_KEY}` };
+  if (body !== null) headers['Content-Type'] = 'application/json';
+
   const res = await fetch(`${BASE_URL}${path}`, {
     method,
-    headers: {
-      'Authorization': `Bearer ${process.env.INSTANTLY_API_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: body ? JSON.stringify(body) : undefined
+    headers,
+    body: body !== null ? JSON.stringify(body) : undefined
   });
 
   if (!res.ok) {
@@ -97,7 +97,7 @@ export async function bulkAddLeads(campaignId, leads) {
 }
 
 export async function activateCampaign(campaignId) {
-  await instantlyRequest(`/campaigns/${campaignId}/activate`, 'POST');
+  await instantlyRequest(`/campaigns/${campaignId}/activate`, 'POST', {});
   logger.info('Campaign activated', { campaign_id: campaignId });
 }
 

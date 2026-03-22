@@ -1,10 +1,8 @@
 import { supabase } from '../utils/supabase.js';
 import { setSetting } from '../utils/settings.js';
 import { logActivity } from '../utils/activity.js';
-import Anthropic from '@anthropic-ai/sdk';
+import { callAI } from '../utils/ai_client.js';
 import logger from '../utils/logger.js';
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || "missing-key" });
 
 export async function analyzeCohorts() {
   try {
@@ -27,9 +25,7 @@ export async function analyzeCohorts() {
       return null;
     }
 
-    const message = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 400,
+    const cohortRaw = await callAI({
       messages: [{
         role: 'user',
         content: `Cold email cohort performance data for AIRO (AI inbound sales call handler).
@@ -51,10 +47,11 @@ Return ONLY JSON:
   "avoid": "what profile consistently underperforms",
   "confidence": "low|medium|high based on sample sizes"
 }`
-      }]
+      }],
+      maxTokens: 400
     });
 
-    const jsonMatch = message.content[0].text.match(/\{[\s\S]*?\}/);
+    const jsonMatch = cohortRaw.match(/\{[\s\S]*?\}/);
     if (!jsonMatch) return null;
 
     const analysis = JSON.parse(jsonMatch[0]);

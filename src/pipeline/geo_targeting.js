@@ -40,7 +40,7 @@ export const GEO_GROUPS = {
     id: 'us_east',
     label: 'US East Coast',
     country: 'United States',
-    timezone: 'America/New_York',
+    timezone: 'America/Detroit',
     send_hours: { from: '08:00', to: '17:30' },
     targets: [
       { city: 'Miami' },

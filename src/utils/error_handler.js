@@ -10,8 +10,8 @@ const ERROR_MESSAGES = {
     action: 'Top up xAI credits at console.x.ai. Enrichment will resume when credits are available.'
   },
   anthropic_credits: {
-    message: 'Anthropic API credits exhausted — copy generation stopped',
-    action: 'Top up Anthropic credits at console.anthropic.com. Copy generation will resume when credits are available.'
+    message: 'Agent Router / DeepSeek API credits exhausted — copy generation stopped',
+    action: 'Check AGENT_ROUTER_API_KEY in Railway Variables or top up Agent Router credits. Copy generation will resume when available.'
   },
   instantly_rate_limit: {
     message: 'Instantly API rate limit hit — pausing for 60 seconds',

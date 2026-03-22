@@ -26,6 +26,52 @@ function parseEmployeeCount(raw) {
   return isNaN(num) ? null : num;
 }
 
+/**
+ * Maps a raw Apify item (boneswill/leads-generator) to the canonical lead shape.
+ * Exported so rerun_from_apify.js can reuse it without duplicating logic.
+ */
+export function mapApifyLead(item) {
+  // Email priority: work email first, personal email fallback, skip if neither
+  const workEmail = item.email?.trim();
+  const personalEmail = item.personal_email?.trim();
+  const email = (workEmail || personalEmail || '').toLowerCase();
+
+  if (!email) return null;
+
+  return {
+    // Personal details
+    email,
+    emailType: workEmail ? 'work' : 'personal',
+    firstName: item.firstName?.trim() || '',
+    lastName: item.lastName?.trim() || '',
+    title: item.title?.trim() || '',
+    linkedinUrl: item.linkedinUrl?.trim() || '',
+    city: item.city?.trim() || '',
+    state: item.state?.trim() || '',
+    country: item.country?.trim() || '',
+
+    // Company details — Apify actor uses organization* prefix
+    companyName: item.organizationName?.trim() || '',
+    companyWebsite: item.organizationWebsite?.trim() || '',
+    companyLinkedinUrl: item.organizationLinkedinUrl?.trim() || '',
+    companyIndustry: item.organizationIndustry?.trim() || '',
+    companySize: item.organizationSize?.trim() || '',
+    companyFoundedYear: item.organizationFoundedYear || null,
+    companyCity: item.organizationCity?.trim() || '',
+    companyState: item.organizationState?.trim() || '',
+    companyCountry: item.organizationCountry?.trim() || '',
+    companyDescription: item.organizationDescription?.trim() || '',
+    companySpecialities: item.organizationSpecialities?.trim() || '',
+
+    // Size bucket for filtering/scoring
+    companySizeBucket: getCompanySizeBucket(parseEmployeeCount(item.organizationSize)),
+
+    // Meta
+    apifyPersonId: item.personId || '',
+    source: 'apify'
+  };
+}
+
 const client = new ApifyClient({ token: process.env.APIFY_API_TOKEN });
 
 // geoTarget: { city?: string, state?: string, country: string } | null
@@ -76,35 +122,23 @@ export async function scrapeLeads(vertical = 'real_estate', geoTarget = null) {
     }
   }
 
-  const allLeads = items.map(item => {
-    const rawCount = item.numEmployees || item.employee_count || item.employeeCount ||
-                     item.companySize || item.company_size || item.employees || null;
-    const employeeCount = parseEmployeeCount(rawCount);
-    return {
-      firstName: item.firstName || item.first_name || '',
-      lastName: item.lastName || item.last_name || '',
-      email: (item.email || '').toLowerCase().trim(),
-      companyName: item.companyName || item.company_name || item.organization || '',
-      companyWebsite: item.companyWebsite || item.company_website || item.website || '',
-      linkedinUrl: item.linkedinUrl || item.linkedin_url || item.linkedin || '',
-      title: item.title || item.jobTitle || item.job_title || '',
-      city: item.city || '',
-      country: item.country || '',
-      employeeCount,
-      companySizeBucket: getCompanySizeBucket(employeeCount)
-    };
-  });
+  const mappedLeads = items.map(mapApifyLead).filter(lead => lead !== null);
+  const noEmailCount = items.length - mappedLeads.length;
 
-  const noEmailCount = allLeads.filter(l => !l.email).length;
-  const withEmail = allLeads.filter(l => l.email && l.email.trim() !== '');
+  await logActivity({
+    category: 'scraping',
+    level: 'info',
+    message: `Apify returned ${items.length} leads — ${mappedLeads.length} have emails, ${noEmailCount} skipped (no email)`,
+    detail: { total: items.length, mapped: mappedLeads.length, skipped_no_email: noEmailCount }
+  });
 
   logger.info('Apify scrape complete', {
     total_items: items.length,
-    with_email: withEmail.length,
+    with_email: mappedLeads.length,
     no_email_skipped: noEmailCount
   });
 
-  return { leads: withEmail, noEmailSkipped: noEmailCount };
+  return { leads: mappedLeads, noEmailSkipped: noEmailCount };
 }
 
 export async function sendLeadCSVToTelegram(leads, bot, chatId, pipelineRunId) {

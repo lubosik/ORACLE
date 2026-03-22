@@ -1,9 +1,8 @@
 import { supabase } from '../utils/supabase.js';
 import { logActivity } from '../utils/activity.js';
-import Anthropic from '@anthropic-ai/sdk';
+import { callAI } from '../utils/ai_client.js';
+import { formatCopyForPrompt } from './ledger.js';
 import logger from '../utils/logger.js';
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || "missing-key" });
 const SYNTHESIS_THRESHOLD = 3;
 
 export async function synthesizeWinners() {
@@ -33,21 +32,35 @@ export async function synthesizeWinners() {
       return null;
     }
 
-    // Get all-time top winners for full context
-    const { data: allWinners } = await supabase
+    // Get all-time top winners with copy snapshots for full context
+    const { data: allWinnersRaw } = await supabase
       .from('experiment_ledger')
       .select('variant_id, what_changed, change_type, positive_reply_rate, hypothesis, delta')
       .eq('outcome', 'winner')
       .order('positive_reply_rate', { ascending: false })
       .limit(15);
 
-    const winnerLines = (allWinners || [])
-      .map(w => `- [${w.change_type}] ${w.what_changed}: ${(w.positive_reply_rate * 100).toFixed(2)}% rate (${w.delta >= 0 ? '+' : ''}${(w.delta * 100).toFixed(2)}pp vs baseline)`)
-      .join('\n');
+    const allWinners = allWinnersRaw || [];
 
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1000,
+    // Fetch copy snapshots for all winners
+    const winnerVariantIds = [...new Set(allWinners.map(w => w.variant_id).filter(Boolean))];
+    const { data: winnerDrafts } = await supabase
+      .from('campaign_drafts')
+      .select('variant_id, sequence_snapshot')
+      .in('variant_id', winnerVariantIds);
+    const copyByVariant = {};
+    for (const d of winnerDrafts || []) {
+      if (d.variant_id && d.sequence_snapshot) copyByVariant[d.variant_id] = d.sequence_snapshot;
+    }
+
+    const winnerLines = allWinners
+      .map(w => {
+        const copy = formatCopyForPrompt(copyByVariant[w.variant_id] || null, { bodyChars: 200 });
+        return `- [${w.change_type}] ${w.what_changed}: ${(w.positive_reply_rate * 100).toFixed(2)}% rate (${w.delta >= 0 ? '+' : ''}${(w.delta * 100).toFixed(2)}pp vs baseline)\n${copy}`;
+      })
+      .join('\n\n');
+
+    const synthRaw = await callAI({
       messages: [{
         role: 'user',
         content: `You are synthesising the learnings from multiple winning cold email experiments for AIRO (AI voice assistant for sales teams). Your job is to extract the universal principles that made these work.
@@ -68,10 +81,11 @@ Return ONLY valid JSON:
   "recommended_sequence_changes": "specific changes to bake permanently into the default sequence",
   "meta_insight": "the single most important thing we now know that we didn't before"
 }`
-      }]
+      }],
+      maxTokens: 1000
     });
 
-    const jsonMatch = message.content[0].text.match(/\{[\s\S]*\}/);
+    const jsonMatch = synthRaw.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return null;
 
     const synthesis = JSON.parse(jsonMatch[0]);

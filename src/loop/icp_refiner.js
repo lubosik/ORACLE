@@ -1,10 +1,8 @@
 import { supabase } from '../utils/supabase.js';
 import { getSetting, setSetting } from '../utils/settings.js';
 import { logActivity } from '../utils/activity.js';
-import Anthropic from '@anthropic-ai/sdk';
+import { callAI } from '../utils/ai_client.js';
 import logger from '../utils/logger.js';
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || "missing-key" });
 
 export async function analyzeICPPerformance() {
   try {
@@ -86,9 +84,7 @@ export async function analyzeICPPerformance() {
 
     const currentICP = await getSetting('refined_icp', 'Default: Real estate directors/CEOs in UK and US, 2-500 employees');
 
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 600,
+    const icpRaw = await callAI({
       messages: [{
         role: 'user',
         content: `Refine the cold email ICP (Ideal Customer Profile) for AIRO based on real performance data.
@@ -110,10 +106,11 @@ Return ONLY valid JSON:
   "deprioritize": "what profile to reduce targeting on",
   "rationale": "data-driven reason for this refinement"
 }`
-      }]
+      }],
+      maxTokens: 600
     });
 
-    const jsonMatch = message.content[0].text.match(/\{[\s\S]*\}/);
+    const jsonMatch = icpRaw.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return null;
 
     const refinement = JSON.parse(jsonMatch[0]);

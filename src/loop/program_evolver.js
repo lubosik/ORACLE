@@ -1,14 +1,12 @@
 import { supabase } from '../utils/supabase.js';
 import { logActivity } from '../utils/activity.js';
-import { getCurrentBaseline } from './ledger.js';
+import { getCurrentBaseline, formatCopyForPrompt } from './ledger.js';
 import { getSetting, setSetting } from '../utils/settings.js';
-import Anthropic from '@anthropic-ai/sdk';
+import { callAI } from '../utils/ai_client.js';
 import logger from '../utils/logger.js';
 import { readFile, writeFile } from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || "missing-key" });
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const EVOLVE_AFTER_N_EXPERIMENTS = 10;
 
@@ -51,15 +49,27 @@ export async function evolveProgramIfReady() {
     const losers = recentExps.filter(e => e.outcome === 'loser');
     const inconclusive = recentExps.filter(e => e.outcome === 'inconclusive');
 
+    // Fetch copy snapshots for winners and top losers so the AI can see what the emails actually said
+    const copyVariantIds = [...new Set([
+      ...winners.slice(0, 5).map(e => e.variant_id),
+      ...losers.slice(0, 3).map(e => e.variant_id)
+    ].filter(Boolean))];
+    const { data: copyDrafts } = await supabase
+      .from('campaign_drafts')
+      .select('variant_id, sequence_snapshot')
+      .in('variant_id', copyVariantIds);
+    const copyByVariant = {};
+    for (const d of copyDrafts || []) {
+      if (d.variant_id && d.sequence_snapshot) copyByVariant[d.variant_id] = d.sequence_snapshot;
+    }
+
     const changeTypeCounts = {};
     for (const exp of recentExps) {
       const ct = exp.change_type || 'copy';
       changeTypeCounts[ct] = (changeTypeCounts[ct] || 0) + 1;
     }
 
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 2000,
+    const evolveRaw = await callAI({
       messages: [{
         role: 'user',
         content: `You are evolving the research program for ORACLE, an autonomous cold email optimisation engine for AIRO.
@@ -77,11 +87,11 @@ ${Object.entries(changeTypeCounts).map(([k, v]) => `  ${k}: ${v} experiments`).j
 
 CURRENT BASELINE RATE: ${baseline?.positive_reply_rate ? (baseline.positive_reply_rate * 100).toFixed(2) + '%' : 'Not yet established'}
 
-TOP WINNERS:
-${winners.slice(0, 5).map(w => `- [${w.change_type}] ${w.what_changed} → ${(w.positive_reply_rate * 100).toFixed(2)}%`).join('\n') || 'None yet'}
+TOP WINNERS (with actual email copy):
+${winners.slice(0, 5).map(w => `- [${w.change_type}] ${w.what_changed} → ${(w.positive_reply_rate * 100).toFixed(2)}%\n${formatCopyForPrompt(copyByVariant[w.variant_id] || null, { bodyChars: 200 })}`).join('\n\n') || 'None yet'}
 
-LOSERS (avoid repeating):
-${losers.slice(0, 3).map(w => `- [${w.change_type}] ${w.what_changed}`).join('\n') || 'None yet'}
+LOSERS — avoid repeating these (with copy):
+${losers.slice(0, 3).map(w => `- [${w.change_type}] ${w.what_changed}\n${formatCopyForPrompt(copyByVariant[w.variant_id] || null, { bodyChars: 120 })}`).join('\n\n') || 'None yet'}
 
 Rewrite the research program based on what's actually been proven. Keep all hard constraints (no em dashes, reply-based CTA, etc). Make it more specific and data-driven. Add learnings. Remove approaches that failed. Focus experiments on the most productive territory.
 
@@ -91,10 +101,11 @@ Return ONLY valid JSON:
   "key_changes": ["what changed and why"],
   "rationale": "overall reason for this evolution"
 }`
-      }]
+      }],
+      maxTokens: 2000
     });
 
-    const jsonMatch = message.content[0].text.match(/\{[\s\S]*\}/);
+    const jsonMatch = evolveRaw.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return null;
 
     const evolution = JSON.parse(jsonMatch[0]);

@@ -1,10 +1,8 @@
 import { supabase } from '../utils/supabase.js';
 import { setSetting } from '../utils/settings.js';
 import { logActivity } from '../utils/activity.js';
-import Anthropic from '@anthropic-ai/sdk';
+import { callAI } from '../utils/ai_client.js';
 import logger from '../utils/logger.js';
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || "missing-key" });
 
 // Fast rule-based pre-filter before spending Claude tokens
 function quickClassify(text) {
@@ -22,9 +20,7 @@ export async function classifyReply(replyText) {
   if (quick) return quick;
 
   try {
-    const msg = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 80,
+    const raw = await callAI({
       messages: [{
         role: 'user',
         content: `Classify this cold email reply for AIRO (AI voice assistant for sales teams).
@@ -32,9 +28,10 @@ export async function classifyReply(replyText) {
 Reply: "${replyText.slice(0, 300)}"
 
 Return ONLY JSON: {"intent": "interested|question|objection|not_interested|auto_reply|other", "sentiment": "positive|neutral|negative"}`
-      }]
+      }],
+      maxTokens: 80
     });
-    const match = msg.content[0].text.match(/\{[\s\S]*?\}/);
+    const match = raw.match(/\{[\s\S]*?\}/);
     if (match) return JSON.parse(match[0]);
   } catch (e) {
     logger.error('Reply classification error', { error: e.message });
@@ -95,9 +92,7 @@ export async function classifyAndAnalyzeReplies() {
       ...(objectionReplies || []).slice(0, 10).map(r => `[OBJECTION]: ${r.inbound_message?.slice(0, 150)}`)
     ].join('\n\n');
 
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 800,
+    const analysisRaw = await callAI({
       messages: [{
         role: 'user',
         content: `Analyse these cold email replies for AIRO (AI voice assistant for inbound sales calls). Identify what triggers genuine interest and what objections come up.
@@ -113,10 +108,11 @@ Return ONLY valid JSON:
   "suggested_copy_focus": "one sentence on what to test next based on these replies",
   "intent_breakdown": {"interested": 0, "question": 0, "objection": 0, "not_interested": 0, "auto_reply": 0}
 }`
-      }]
+      }],
+      maxTokens: 800
     });
 
-    const jsonMatch = message.content[0].text.match(/\{[\s\S]*\}/);
+    const jsonMatch = analysisRaw.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return null;
 
     const analysis = JSON.parse(jsonMatch[0]);

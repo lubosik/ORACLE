@@ -1,4 +1,4 @@
-import { getRecentExperiments, getCurrentBaseline, logExperiment, updateExperimentResult, promoteToBaseline } from './ledger.js';
+import { getRecentExperimentsWithCopy, getCurrentBaseline, logExperiment, updateExperimentResult, promoteToBaseline } from './ledger.js';
 import { generateHypothesis } from './hypothesis.js';
 import { runPipeline } from '../pipeline/index.js';
 import { sendTelegram } from '../telegram/bot.js';
@@ -24,7 +24,7 @@ export async function runExperimentLoop() {
     const timingInsights = await collectTimingInsights();
     const currentSchedule = await getSchedule();
 
-    const ledger = await getRecentExperiments(10);
+    const ledger = await getRecentExperimentsWithCopy(10);
     const baseline = await getCurrentBaseline('real_estate');
 
     // Load all intelligence signals for richer hypothesis generation
@@ -95,8 +95,8 @@ export async function runExperimentLoop() {
       detail: { variant_id: hypothesis.variant_id, change_type: hypothesis.change_type }
     });
 
-    logger.info('Launching pipeline with new variant', { variant_id: hypothesis.variant_id });
-    await runPipeline(hypothesis.variant_id);
+    logger.info('Launching pipeline with new variant', { variant_id: hypothesis.variant_id, change_type: hypothesis.change_type });
+    await runPipeline(hypothesis.variant_id, hypothesis.instructions_for_copywriter || null);
 
     // If schedule was changed for this experiment, revert after pipeline run
     // (the campaign itself will keep its schedule; settings revert to original for future campaigns)

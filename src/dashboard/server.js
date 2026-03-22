@@ -64,16 +64,13 @@ app.get('/api/health', async (req, res) => {
     checks.instantly = { status: 'error', error: e.message };
   }
 
-  // Anthropic — live ping
+  // Agent Router (DeepSeek) — live ping
   try {
-    if (!process.env.ANTHROPIC_API_KEY) {
+    if (!process.env.AGENT_ROUTER_API_KEY) {
       checks.anthropic = { status: 'missing' };
     } else {
-      const ar = await fetch('https://api.anthropic.com/v1/models', {
-        headers: {
-          'x-api-key': process.env.ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01'
-        }
+      const ar = await fetch('https://agentrouter.org/v1/models', {
+        headers: { 'Authorization': `Bearer ${process.env.AGENT_ROUTER_API_KEY}` }
       });
       checks.anthropic = { status: ar.ok ? 'connected' : 'error', http_status: ar.status };
     }
@@ -242,6 +239,38 @@ app.post('/api/pipeline/run', async (req, res) => {
     // Run async after responding so HTTP doesn't time out
     const { runPipeline } = await import('../pipeline/index.js');
     runPipeline().catch(err => logger.error('Manual pipeline trigger failed', { error: err.message }));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Re-run pipeline from an Apify dataset (no new scrape)
+// Pass { datasetId: '...' } to use a specific dataset, or omit to auto-detect the last run
+app.post('/api/pipeline/rerun-last-dataset', async (req, res) => {
+  try {
+    const { datasetId } = req.body || {};
+    const msg = datasetId
+      ? `Manual re-run triggered from dataset ${datasetId}`
+      : 'Manual re-run triggered from last Apify dataset';
+    await logActivity({ category: 'system', level: 'info', message: msg });
+    res.json({ ok: true, message: 'Re-run started — watch the activity feed' });
+    const { rerunFromDataset, rerunFromLastDataset } = await import('../pipeline/rerun_from_apify.js');
+    const fn = datasetId
+      ? () => rerunFromDataset(datasetId)
+      : () => rerunFromLastDataset();
+    fn().catch(err => logger.error('Re-run failed', { err: err.message }));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Validate an Instantly timezone string
+app.post('/api/validate-timezone', async (req, res) => {
+  try {
+    const { resolveTimezone } = await import('../utils/timezones.js');
+    const { timezone } = req.body;
+    const result = resolveTimezone(timezone);
+    res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -662,7 +691,11 @@ app.post('/api/campaigns/:id/activate', async (req, res) => {
   try {
     const r = await fetch(`${process.env.INSTANTLY_BASE_URL}/campaigns/${req.params.id}/activate`, {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${process.env.INSTANTLY_API_KEY}` }
+      headers: {
+        'Authorization': `Bearer ${process.env.INSTANTLY_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({})
     });
     const result = await r.json();
     await logActivity({ category: 'campaign', level: 'success', message: `Campaign activated from dashboard — ID: ${req.params.id}`, campaign_id: req.params.id });

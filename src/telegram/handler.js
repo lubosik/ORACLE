@@ -1,7 +1,7 @@
 import { supabase } from '../utils/supabase.js';
 import { getPendingEdits } from './bot.js';
 import { logActivity } from '../utils/activity.js';
-import { launchApprovedCampaign } from '../pipeline/launch_approved.js';
+import { launchApprovedCampaign, activateStagedCampaign } from '../pipeline/launch_approved.js';
 import logger from '../utils/logger.js';
 import 'dotenv/config';
 
@@ -72,6 +72,70 @@ export async function handleCallback(query, bot) {
     } catch (err) {
       await bot.sendMessage(chatId, `Campaign launch failed: ${err.message}\n\nCheck Railway logs for details.`);
     }
+    return;
+  }
+
+  // --- Launch staged campaign (after user reviews in Instantly UI) ---
+  if (callbackData.startsWith('launchcampaign_')) {
+    const draftId = callbackData.replace('launchcampaign_', '');
+
+    const { data: draft } = await supabase
+      .from('campaign_drafts')
+      .select('*')
+      .eq('id', draftId)
+      .eq('status', 'staged')
+      .single();
+
+    if (!draft || !draft.instantly_campaign_id) {
+      await bot.sendMessage(chatId, 'Campaign not found or already launched.');
+      return;
+    }
+
+    await bot.editMessageText(
+      `ORACLE — LAUNCHING...\n${draft.campaign_name}\nActivating campaign in Instantly now...`,
+      { chat_id: message.chat.id, message_id: message.message_id }
+    );
+
+    try {
+      await activateStagedCampaign(draft.instantly_campaign_id, draft);
+
+      await bot.sendMessage(chatId,
+        `ORACLE — CAMPAIGN LIVE\n\nName: ${draft.campaign_name}\nInstantly ID: ${draft.instantly_campaign_id}\n\nEmails are now sending. Monitor from the ORACLE dashboard.`
+      );
+
+      await logActivity({
+        category: 'approval',
+        level: 'success',
+        message: `Campaign launched via Telegram — now active in Instantly`,
+        detail: { draft_id: draftId, instantly_campaign_id: draft.instantly_campaign_id }
+      });
+    } catch (err) {
+      await bot.sendMessage(chatId, `Failed to activate campaign: ${err.message}\n\nYou can activate it manually in Instantly.`);
+      logger.error('Campaign activation failed', { error: err.message, draft_id: draftId });
+    }
+    return;
+  }
+
+  // --- Cancel a staged campaign ---
+  if (callbackData.startsWith('cancelcampaign_')) {
+    const draftId = callbackData.replace('cancelcampaign_', '');
+
+    await supabase
+      .from('campaign_drafts')
+      .update({ status: 'cancelled', actioned_at: new Date().toISOString() })
+      .eq('id', draftId);
+
+    await bot.editMessageText(
+      `ORACLE — CAMPAIGN CANCELLED\nCampaign remains in Instantly as a draft. Delete it manually if needed.`,
+      { chat_id: message.chat.id, message_id: message.message_id }
+    );
+
+    await logActivity({
+      category: 'approval',
+      level: 'warning',
+      message: `Staged campaign cancelled via Telegram`,
+      detail: { draft_id: draftId }
+    });
     return;
   }
 
