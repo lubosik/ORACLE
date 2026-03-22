@@ -8,13 +8,22 @@ import OpenAI from 'openai';
 import { logActivity } from './activity.js';
 import 'dotenv/config';
 
-const client = new OpenAI({
-  apiKey: process.env.AGENT_ROUTER_API_KEY,
-  baseURL: process.env.AGENT_ROUTER_BASE_URL || 'https://agentrouter.org/'
-});
-
 const PRIMARY_MODEL = process.env.AGENT_ROUTER_PRIMARY_MODEL || 'claude-sonnet-4-5-20250514';
 const FALLBACK_MODEL = process.env.AGENT_ROUTER_FALLBACK_MODEL || 'deepseek/deepseek-chat';
+
+// Lazy singleton — constructed on first use so missing env var doesn't crash startup
+let _client = null;
+function getClient() {
+  if (!_client) {
+    const apiKey = process.env.AGENT_ROUTER_API_KEY;
+    if (!apiKey) throw new Error('AGENT_ROUTER_API_KEY is not set');
+    _client = new OpenAI({
+      apiKey,
+      baseURL: process.env.AGENT_ROUTER_BASE_URL || 'https://agentrouter.org/'
+    });
+  }
+  return _client;
+}
 
 /**
  * Call the AI with automatic primary → fallback routing.
@@ -40,9 +49,6 @@ export async function callAI({
   module: mod = 'unknown',
   expectJSON = false
 }) {
-  const apiKey = process.env.AGENT_ROUTER_API_KEY;
-  if (!apiKey) throw new Error('AGENT_ROUTER_API_KEY is not set');
-
   const resolvedSystem = systemPrompt || system;
   const builtMessages = [];
   if (resolvedSystem) {
@@ -54,7 +60,7 @@ export async function callAI({
 
   // Try primary model first
   try {
-    const response = await client.chat.completions.create({
+    const response = await getClient().chat.completions.create({
       model: PRIMARY_MODEL,
       messages: builtMessages,
       max_tokens: maxTokens,
@@ -91,7 +97,7 @@ export async function callAI({
 
     // Try fallback model
     try {
-      const fallbackResponse = await client.chat.completions.create({
+      const fallbackResponse = await getClient().chat.completions.create({
         model: FALLBACK_MODEL,
         messages: builtMessages,
         max_tokens: maxTokens,

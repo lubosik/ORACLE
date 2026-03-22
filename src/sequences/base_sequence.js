@@ -72,12 +72,3 @@ If that sounds familiar at {{companyName}}, just reply yes and I will send over 
     }
   ]
 };
-
-// Console log for manual review before next pipeline run
-console.log('\n=== BASE_SEQUENCE v2_refined — FULL BODIES FOR REVIEW ===\n');
-BASE_SEQUENCE.emails.forEach(e => {
-  console.log(`--- EMAIL ${e.step} (delay: ${e.delay_days}d) ---`);
-  console.log(`Subject: ${e.subject}`);
-  console.log(`Body:\n${e.body}`);
-  console.log('');
-});
