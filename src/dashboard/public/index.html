@@ -1382,6 +1382,89 @@
         </div>
       </div>
 
+      <!-- Meta Ads Sourcing Channel -->
+      <div class="card" style="padding:24px;grid-column:1/-1;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+          <div class="card-title">Meta Ads Sourcing Channel</div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span id="meta-ads-status-label" style="font-size:11px;font-family:var(--font-mono);color:var(--text-muted);">loading...</span>
+            <button id="meta-ads-toggle-btn" onclick="toggleMetaAds()" style="
+              background:rgba(124,92,252,0.15);border:1px solid rgba(124,92,252,0.35);
+              color:var(--violet-bright);border-radius:8px;padding:6px 14px;
+              font-size:12px;cursor:pointer;font-family:var(--font-body);font-weight:500;
+            ">Toggle</button>
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:20px;">
+          Keyword-based Facebook/Instagram Ad Library scraper. Runs Tue + Thu at 02:00 UTC. Each run rotates to the least-recently-used keyword. ~$7.60 per 50-lead run.
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div style="font-size:12px;color:var(--text-secondary);font-weight:500;">Keywords</div>
+          <div style="display:flex;gap:8px;">
+            <button onclick="showAddMetaKeyword()" style="
+              background:rgba(255,255,255,0.04);border:1px solid var(--card-border);
+              color:var(--text-secondary);border-radius:6px;padding:5px 12px;
+              font-size:11px;cursor:pointer;font-family:var(--font-body);
+            ">+ Add Keyword</button>
+            <button onclick="runMetaAdsPipeline()" style="
+              background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.3);
+              color:var(--green);border-radius:6px;padding:5px 12px;
+              font-size:11px;cursor:pointer;font-family:var(--font-body);font-weight:500;
+            ">Run Now</button>
+          </div>
+        </div>
+
+        <div id="meta-add-keyword-form" style="display:none;margin-bottom:14px;padding:12px;background:rgba(255,255,255,0.03);border:1px solid var(--card-border);border-radius:8px;">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <input id="meta-kw-input" type="text" placeholder="keyword" style="
+              flex:1;min-width:160px;background:rgba(255,255,255,0.05);border:1px solid var(--card-border);
+              border-radius:6px;padding:6px 10px;color:var(--text-primary);font-family:var(--font-mono);font-size:12px;outline:none;
+            ">
+            <select id="meta-kw-country" style="
+              background:rgba(255,255,255,0.05);border:1px solid var(--card-border);
+              border-radius:6px;padding:6px 10px;color:var(--text-primary);font-family:var(--font-mono);font-size:12px;outline:none;
+            ">
+              <option value="GB">GB</option>
+              <option value="US">US</option>
+            </select>
+            <input id="meta-kw-notes" type="text" placeholder="notes (optional)" style="
+              flex:2;min-width:120px;background:rgba(255,255,255,0.05);border:1px solid var(--card-border);
+              border-radius:6px;padding:6px 10px;color:var(--text-primary);font-family:var(--font-mono);font-size:12px;outline:none;
+            ">
+            <button onclick="addMetaKeyword()" style="
+              background:rgba(124,92,252,0.15);border:1px solid rgba(124,92,252,0.35);
+              color:var(--violet-bright);border-radius:6px;padding:6px 14px;
+              font-size:11px;cursor:pointer;font-family:var(--font-body);font-weight:500;
+            ">Add</button>
+            <button onclick="document.getElementById('meta-add-keyword-form').style.display='none'" style="
+              background:transparent;border:1px solid var(--card-border);
+              color:var(--text-muted);border-radius:6px;padding:6px 10px;
+              font-size:11px;cursor:pointer;
+            ">Cancel</button>
+          </div>
+          <div id="meta-kw-confirm" style="display:none;font-size:11px;color:var(--green);font-family:var(--font-mono);margin-top:8px;"></div>
+        </div>
+
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <thead>
+              <tr style="border-bottom:1px solid var(--card-border);">
+                <th style="text-align:left;padding:6px 10px;color:var(--text-muted);font-weight:400;font-size:11px;">Keyword</th>
+                <th style="text-align:left;padding:6px 10px;color:var(--text-muted);font-weight:400;font-size:11px;">Country</th>
+                <th style="text-align:left;padding:6px 10px;color:var(--text-muted);font-weight:400;font-size:11px;">Last Run</th>
+                <th style="text-align:right;padding:6px 10px;color:var(--text-muted);font-weight:400;font-size:11px;">Leads</th>
+                <th style="text-align:center;padding:6px 10px;color:var(--text-muted);font-weight:400;font-size:11px;">Status</th>
+              </tr>
+            </thead>
+            <tbody id="meta-keywords-tbody">
+              <tr><td colspan="5" style="padding:12px 10px;color:var(--text-muted);font-size:11px;font-family:var(--font-mono);">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div id="meta-run-confirm" style="display:none;font-size:11px;color:var(--green);font-family:var(--font-mono);margin-top:10px;"></div>
+      </div>
+
     </div>
 
     <!-- Inbox Status Table -->
@@ -2885,6 +2968,122 @@
   }
 
   // loadResearch is included in refreshAll() and the staggered setInterval above
+
+  // ---- Meta Ads ----
+
+  async function loadMetaAdsKeywords() {
+    try {
+      const r = await fetch('/api/meta-ads/keywords');
+      const keywords = await r.json();
+      const tbody = document.getElementById('meta-keywords-tbody');
+      if (!keywords.length) {
+        tbody.innerHTML = '<tr><td colspan="5" style="padding:12px 10px;color:var(--text-muted);font-size:11px;font-family:var(--font-mono);">No keywords configured.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = keywords.map(k => {
+        const lastRun = k.last_run_at
+          ? new Date(k.last_run_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+          : 'Never';
+        const statusColor = k.is_active ? 'var(--green)' : 'var(--text-muted)';
+        const statusText = k.is_active ? '● ON' : '○ OFF';
+        return `<tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+          <td style="padding:7px 10px;color:var(--text-primary);font-family:var(--font-mono);font-size:12px;">${k.keyword}</td>
+          <td style="padding:7px 10px;color:var(--text-secondary);font-size:12px;">${k.country}</td>
+          <td style="padding:7px 10px;color:var(--text-muted);font-size:11px;font-family:var(--font-mono);">${lastRun}</td>
+          <td style="padding:7px 10px;color:var(--text-secondary);font-size:12px;text-align:right;">${k.total_leads_returned || 0}</td>
+          <td style="padding:7px 10px;text-align:center;">
+            <span onclick="toggleMetaKeyword('${k.id}', ${k.is_active})" style="color:${statusColor};font-size:11px;font-family:var(--font-mono);cursor:pointer;">${statusText}</span>
+          </td>
+        </tr>`;
+      }).join('');
+    } catch (e) {
+      document.getElementById('meta-keywords-tbody').innerHTML =
+        '<tr><td colspan="5" style="padding:12px 10px;color:var(--red);font-size:11px;">Failed to load keywords</td></tr>';
+    }
+  }
+
+  async function toggleMetaKeyword(id, currentlyActive) {
+    await fetch(`/api/meta-ads/keywords/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_active: !currentlyActive })
+    });
+    loadMetaAdsKeywords();
+  }
+
+  async function addMetaKeyword() {
+    const keyword = document.getElementById('meta-kw-input').value.trim();
+    const country = document.getElementById('meta-kw-country').value;
+    const notes = document.getElementById('meta-kw-notes').value.trim();
+    if (!keyword) return;
+    const r = await fetch('/api/meta-ads/keywords', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keyword, country, notes })
+    });
+    const confirm = document.getElementById('meta-kw-confirm');
+    if (r.ok) {
+      confirm.textContent = `"${keyword}" added.`;
+      confirm.style.display = 'block';
+      document.getElementById('meta-kw-input').value = '';
+      document.getElementById('meta-kw-notes').value = '';
+      loadMetaAdsKeywords();
+      setTimeout(() => { confirm.style.display = 'none'; }, 3000);
+    } else {
+      const d = await r.json();
+      confirm.textContent = 'Error: ' + d.error;
+      confirm.style.color = 'var(--red)';
+      confirm.style.display = 'block';
+    }
+  }
+
+  function showAddMetaKeyword() {
+    document.getElementById('meta-add-keyword-form').style.display = 'block';
+    document.getElementById('meta-kw-input').focus();
+  }
+
+  async function runMetaAdsPipeline() {
+    const confirm = document.getElementById('meta-run-confirm');
+    confirm.textContent = 'Starting Meta Ads pipeline — watch the activity feed...';
+    confirm.style.display = 'block';
+    confirm.style.color = 'var(--green)';
+    try {
+      const r = await fetch('/api/meta-ads/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+      const d = await r.json();
+      confirm.textContent = d.message || 'Pipeline started.';
+    } catch (e) {
+      confirm.textContent = 'Failed to start: ' + e.message;
+      confirm.style.color = 'var(--red)';
+    }
+  }
+
+  async function loadMetaAdsToggleState() {
+    try {
+      const r = await fetch('/api/settings');
+      const settings = await r.json();
+      const enabled = settings.meta_ads_enabled !== 'false';
+      const label = document.getElementById('meta-ads-status-label');
+      const btn = document.getElementById('meta-ads-toggle-btn');
+      label.textContent = enabled ? 'ENABLED' : 'DISABLED';
+      label.style.color = enabled ? 'var(--green)' : 'var(--text-muted)';
+      btn.dataset.currentState = enabled ? 'true' : 'false';
+    } catch (e) {}
+  }
+
+  async function toggleMetaAds() {
+    const btn = document.getElementById('meta-ads-toggle-btn');
+    const currentlyEnabled = btn.dataset.currentState !== 'false';
+    await fetch('/api/meta-ads/toggle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: !currentlyEnabled })
+    });
+    loadMetaAdsToggleState();
+  }
+
+  // Load Meta Ads section on page ready
+  loadMetaAdsKeywords();
+  loadMetaAdsToggleState();
 
 </script>
 </body>

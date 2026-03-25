@@ -42,6 +42,18 @@ export async function sendTelegramWithButtons(message, inlineKeyboard) {
   }
 }
 
+export async function stopTelegramBot() {
+  if (bot) {
+    try {
+      await bot.stopPolling();
+      bot = null;
+      logger.info('Telegram bot polling stopped');
+    } catch (err) {
+      logger.warn('Error stopping Telegram bot polling', { error: err.message });
+    }
+  }
+}
+
 export function startTelegramBot() {
   if (!process.env.TELEGRAM_BOT_TOKEN) {
     logger.warn('TELEGRAM_BOT_TOKEN not set, Telegram bot disabled');
@@ -67,8 +79,14 @@ export function startTelegramBot() {
     }
   });
 
-  bot.on('polling_error', (err) => {
-    logger.error('Telegram polling error', { error: err.message });
+  bot.on('polling_error', async (err) => {
+    if (err.message && err.message.includes('409 Conflict')) {
+      logger.warn('Telegram 409 Conflict: another instance is polling. Retrying in 15s...');
+      await stopTelegramBot();
+      setTimeout(() => startTelegramBot(), 15000);
+    } else {
+      logger.error('Telegram polling error', { error: err.message });
+    }
   });
 
   logger.info('Telegram bot started');

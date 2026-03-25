@@ -9,9 +9,9 @@ const ERROR_MESSAGES = {
     message: 'Grok API credits exhausted — enrichment stopped',
     action: 'Top up xAI credits at console.x.ai. Enrichment will resume when credits are available.'
   },
-  anthropic_credits: {
-    message: 'Agent Router / DeepSeek API credits exhausted — copy generation stopped',
-    action: 'Check AGENT_ROUTER_API_KEY in Railway Variables or top up Agent Router credits. Copy generation will resume when available.'
+  nvidia_credits: {
+    message: 'NVIDIA NIM API credits exhausted — copy generation stopped',
+    action: 'Top up NVIDIA NIM credits at build.nvidia.com or verify NVIDIA_NIM_API_KEY in Railway Variables. Copy generation will resume when available.'
   },
   instantly_rate_limit: {
     message: 'Instantly API rate limit hit — pausing for 60 seconds',
@@ -61,7 +61,7 @@ export function classifyError(error, apiName) {
   if (msg.includes('credit') || msg.includes('quota') || msg.includes('insufficient')) {
     if (apiName === 'apify') return 'apify_credits';
     if (apiName === 'grok' || apiName === 'xai') return 'grok_credits';
-    if (apiName === 'anthropic') return 'anthropic_credits';
+    if (apiName === 'nvidia' || apiName === 'kimi') return 'nvidia_credits';
   }
   return 'unknown';
 }

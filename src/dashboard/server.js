@@ -19,6 +19,7 @@ import { getVerticals, updateVerticalStatus } from '../loop/vertical_researcher.
 import { getBanditState } from '../loop/multi_armed_bandit.js';
 import logger from '../utils/logger.js';
 import 'dotenv/config';
+import { runMetaAdsPipeline } from '../pipeline/meta_ads_pipeline.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -64,18 +65,18 @@ app.get('/api/health', async (req, res) => {
     checks.instantly = { status: 'error', error: e.message };
   }
 
-  // Agent Router (DeepSeek) — live ping
+  // NVIDIA NIM (Kimi K2.5) — live ping
   try {
-    if (!process.env.AGENT_ROUTER_API_KEY) {
-      checks.anthropic = { status: 'missing' };
+    if (!process.env.NVIDIA_NIM_API_KEY) {
+      checks.nvidia_nim = { status: 'missing' };
     } else {
-      const ar = await fetch('https://agentrouter.org/v1/models', {
-        headers: { 'Authorization': `Bearer ${process.env.AGENT_ROUTER_API_KEY}` }
+      const nr = await fetch('https://integrate.api.nvidia.com/v1/models', {
+        headers: { 'Authorization': `Bearer ${process.env.NVIDIA_NIM_API_KEY}` }
       });
-      checks.anthropic = { status: ar.ok ? 'connected' : 'error', http_status: ar.status };
+      checks.nvidia_nim = { status: nr.ok ? 'connected' : 'error', http_status: nr.status };
     }
   } catch (e) {
-    checks.anthropic = { status: 'error', error: e.message };
+    checks.nvidia_nim = { status: 'error', error: e.message };
   }
 
   // xAI Grok — live ping
@@ -873,6 +874,108 @@ app.get('/api/research/bandit', async (req, res) => {
   try {
     res.json(await getBanditState());
   } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ---- Meta Ads sourcing channel ----
+
+app.get('/api/meta-ads/keywords', async (req, res) => {
+  try {
+    const { data } = await supabase
+      .from('meta_ads_keywords')
+      .select('*')
+      .order('last_run_at', { ascending: false });
+    res.json(data || []);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/meta-ads/keywords', async (req, res) => {
+  try {
+    const { keyword, country, notes } = req.body;
+    if (!keyword) return res.status(400).json({ error: 'keyword is required' });
+    const { data, error } = await supabase
+      .from('meta_ads_keywords')
+      .insert({ keyword, country: country || 'US', notes })
+      .select()
+      .single();
+    if (error) return res.status(400).json({ error: error.message });
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.patch('/api/meta-ads/keywords/:id', async (req, res) => {
+  try {
+    const { is_active } = req.body;
+    await supabase
+      .from('meta_ads_keywords')
+      .update({ is_active })
+      .eq('id', req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/meta-ads/leads', async (req, res) => {
+  try {
+    const { data } = await supabase
+      .from('meta_ads_leads')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(100);
+    res.json(data || []);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/meta-ads/run', async (req, res) => {
+  try {
+    const { keyword, country } = req.body;
+    const runId = crypto.randomUUID();
+
+    await logActivity({
+      category: 'system',
+      level: 'info',
+      message: `Meta Ads pipeline manually triggered — keyword: ${keyword || 'auto-select'}`
+    });
+
+    runMetaAdsPipeline(runId, { keyword, country }).catch(err =>
+      logger.error('Manual Meta Ads pipeline failed', { err: err.message })
+    );
+
+    res.json({ ok: true, run_id: runId, message: 'Meta Ads pipeline started — watch activity feed' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/meta-ads/toggle', async (req, res) => {
+  try {
+    const { enabled } = req.body;
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({ error: 'enabled must be a boolean' });
+    }
+
+    await supabase
+      .from('system_settings')
+      .upsert({ key: 'meta_ads_enabled', value: enabled ? 'true' : 'false', updated_at: new Date().toISOString() });
+
+    process.env.META_ADS_ENABLED = enabled ? 'true' : 'false';
+
+    await logActivity({
+      category: 'system',
+      level: enabled ? 'success' : 'warning',
+      message: `Meta Ads channel ${enabled ? 'ENABLED' : 'DISABLED'} via dashboard`
+    });
+
+    res.json({ meta_ads_enabled: enabled });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 export function startDashboard() {

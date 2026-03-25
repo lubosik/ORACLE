@@ -83,10 +83,11 @@ export async function launchApprovedCampaign(draft) {
       },
       sequences: [{
         steps: [
-          { type: 'email', delay: 0, variants: [{ subject: seq.email_1.subject, body: seq.email_1.body }] },
-          { type: 'email', delay: 3, variants: [{ subject: seq.email_2.subject, body: seq.email_2.body }] },
-          { type: 'email', delay: 4, variants: [{ subject: seq.email_3.subject, body: seq.email_3.body }] },
-          { type: 'email', delay: 6, variants: [{ subject: seq.email_4.subject, body: seq.email_4.body }] }
+          { type: 'email', delay: 0,  delay_unit: 'days', variants: [{ subject: seq.email_1.subject, body: seq.email_1.body }] },
+          { type: 'email', delay: 3,  delay_unit: 'days', variants: [{ subject: seq.email_2.subject, body: seq.email_2.body }] },
+          { type: 'email', delay: 4,  delay_unit: 'days', variants: [{ subject: seq.email_3.subject, body: seq.email_3.body }] },
+          { type: 'email', delay: 6,  delay_unit: 'days', variants: [{ subject: seq.email_4.subject, body: seq.email_4.body }] },
+          { type: 'email', delay: 30, delay_unit: 'days', variants: [{ subject: seq.email_5.subject, body: seq.email_5.body }] }
         ]
       }],
       ...CONFIG.campaign_settings,

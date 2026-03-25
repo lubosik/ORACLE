@@ -1,152 +1,164 @@
-/**
- * Shared AI client for ORACLE — routes all LLM calls through AgentRouter.
- * Uses OpenAI SDK (AgentRouter is fully OpenAI-compatible).
- * Primary model: claude-sonnet-4-5-20250514
- * Fallback model: deepseek/deepseek-chat
- */
 import OpenAI from 'openai';
 import { logActivity } from './activity.js';
-import 'dotenv/config';
+import { sendTelegram as sendTelegramAlert } from '../telegram/bot.js';
 
-const PRIMARY_MODEL = process.env.AGENT_ROUTER_PRIMARY_MODEL || 'claude-sonnet-4-5-20250514';
-const FALLBACK_MODEL = process.env.AGENT_ROUTER_FALLBACK_MODEL || 'deepseek/deepseek-chat';
+const client = new OpenAI({
+  apiKey: process.env.NVIDIA_NIM_API_KEY,
+  baseURL: 'https://integrate.api.nvidia.com/v1',
+  timeout: 300000 // 5 minutes — Kimi K2.5 is a reasoning model and thinks before responding
+});
 
-// Lazy singleton — constructed on first use so missing env var doesn't crash startup
-let _client = null;
-function getClient() {
-  if (!_client) {
-    const apiKey = process.env.AGENT_ROUTER_API_KEY;
-    if (!apiKey) throw new Error('AGENT_ROUTER_API_KEY is not set');
-    _client = new OpenAI({
-      apiKey,
-      baseURL: process.env.AGENT_ROUTER_BASE_URL || 'https://agentrouter.org/'
-    });
+const MODEL = 'moonshotai/kimi-k2.5';
+
+/**
+ * Validate and extract content string from a NVIDIA NIM response.
+ * Returns { content, error } rather than throwing so callers get context.
+ */
+function extractContent(response) {
+  if (!response) {
+    return { content: null, error: 'Kimi K2.5 returned null or undefined response' };
   }
-  return _client;
+
+  if (response.error) {
+    return {
+      content: null,
+      error: `Kimi K2.5 API error: ${response.error.message || JSON.stringify(response.error)}`
+    };
+  }
+
+  if (!response.choices || !Array.isArray(response.choices)) {
+    return {
+      content: null,
+      error: `Kimi K2.5 response missing choices array. Raw: ${JSON.stringify(response).slice(0, 500)}`
+    };
+  }
+
+  if (response.choices.length === 0) {
+    return {
+      content: null,
+      error: `Kimi K2.5 returned empty choices array. Raw: ${JSON.stringify(response).slice(0, 500)}`
+    };
+  }
+
+  const message = response.choices[0]?.message;
+
+  if (!message) {
+    return {
+      content: null,
+      error: `Kimi K2.5 choices[0].message is undefined. Raw: ${JSON.stringify(response).slice(0, 500)}`
+    };
+  }
+
+  // Kimi K2.5 is a reasoning model — content is null while thinking, populated after.
+  // If content is null but reasoning exists, max_tokens was too low to finish thinking.
+  const content = message.content;
+  const reasoning = message.reasoning;
+
+  if ((content === null || content === undefined || content === '') && reasoning) {
+    return {
+      content: null,
+      error: `Kimi K2.5 ran out of tokens during reasoning (finish_reason: ${response.choices[0]?.finish_reason}). Increase maxTokens — current usage: ${response.usage?.total_tokens} tokens.`
+    };
+  }
+
+  if (content === null || content === undefined || content === '') {
+    return {
+      content: null,
+      error: `Kimi K2.5 returned empty content. Finish reason: ${response.choices[0]?.finish_reason}`
+    };
+  }
+
+  return { content, error: null };
 }
 
 /**
- * Call the AI with automatic primary → fallback routing.
- * Returns the response content string, or parsed JSON if expectJSON=true.
- * Supports both `system` and `systemPrompt` param names for backwards compatibility.
- * Throws only if both primary and fallback fail.
- *
- * @param {object} opts
- * @param {Array}   opts.messages         - OpenAI-style messages array [{role, content}]
- * @param {string}  [opts.systemPrompt]   - System prompt (preferred param name)
- * @param {string}  [opts.system]         - System prompt (legacy alias)
- * @param {number}  [opts.maxTokens=1000] - Max tokens to generate
- * @param {number}  [opts.temperature=0.7]
- * @param {string}  [opts.module]         - Caller module name (for logging)
- * @param {boolean} [opts.expectJSON]     - Parse and return JSON instead of raw string
+ * Call Kimi K2.5 via NVIDIA NIM.
+ * Used by every ORACLE module for all AI calls.
+ * Throws with a descriptive error if the call fails.
  */
 export async function callAI({
   messages,
   systemPrompt = null,
-  system = null,
-  maxTokens = 1000,
+  maxTokens = 2000,
   temperature = 0.7,
-  module: mod = 'unknown',
+  module: moduleName = 'unknown',
   expectJSON = false
 }) {
-  const resolvedSystem = systemPrompt || system;
   const builtMessages = [];
-  if (resolvedSystem) {
-    builtMessages.push({ role: 'system', content: resolvedSystem });
+
+  if (systemPrompt) {
+    builtMessages.push({ role: 'system', content: systemPrompt });
   }
+
   for (const msg of messages) {
     builtMessages.push(msg);
   }
 
-  // Try primary model first
+  let response;
+
   try {
-    const response = await getClient().chat.completions.create({
-      model: PRIMARY_MODEL,
+    response = await client.chat.completions.create({
+      model: MODEL,
       messages: builtMessages,
-      max_tokens: maxTokens,
-      temperature
+      max_tokens: Math.min(maxTokens, 16384),
+      temperature: Math.min(temperature, 1.0),
+      top_p: 1.0
+    });
+  } catch (err) {
+    const errMsg = `Kimi K2.5 request failed in ${moduleName}: ${err.message}`;
+
+    await logActivity({
+      category: 'error',
+      level: 'error',
+      message: errMsg,
+      detail: { module: moduleName, error: err.message }
     });
 
-    const content = response.choices[0]?.message?.content || '';
+    await sendTelegramAlert(
+      `ORACLE ERROR\n\nModule: ${moduleName}\nModel: ${MODEL}\nError: ${err.message}\n\nCheck NVIDIA NIM credits at: build.nvidia.com`
+    );
 
-    logActivity({
-      category: 'system',
-      level: 'info',
-      message: `AI call successful via ${PRIMARY_MODEL}`,
-      detail: { module: mod, model: PRIMARY_MODEL, tokens_used: response.usage?.total_tokens }
-    }).catch(() => {});
-
-    return expectJSON ? sanitiseJSON(content) : content;
-
-  } catch (primaryErr) {
-    const isCredit = isCreditsError(primaryErr);
-    const isRate = isRateLimitError(primaryErr);
-
-    logActivity({
-      category: 'error',
-      level: 'warning',
-      message: `Primary model ${PRIMARY_MODEL} failed in ${mod} — trying fallback`,
-      detail: { error: primaryErr.message, is_credit: isCredit, is_rate: isRate }
-    }).catch(() => {});
-
-    if (isCredit) {
-      sendAlert(
-        `ORACLE — AgentRouter Credit Warning\n\nPrimary model (${PRIMARY_MODEL}) returned a credit error.\nFalling back to ${FALLBACK_MODEL}.\n\nTop up credits at agentrouter.org/console`
-      );
-    }
-
-    // Try fallback model
-    try {
-      const fallbackResponse = await getClient().chat.completions.create({
-        model: FALLBACK_MODEL,
-        messages: builtMessages,
-        max_tokens: maxTokens,
-        temperature
-      });
-
-      const content = fallbackResponse.choices[0]?.message?.content || '';
-
-      logActivity({
-        category: 'system',
-        level: 'warning',
-        message: `AI call completed via FALLBACK model ${FALLBACK_MODEL}`,
-        detail: { module: mod, model: FALLBACK_MODEL, tokens_used: fallbackResponse.usage?.total_tokens }
-      }).catch(() => {});
-
-      return expectJSON ? sanitiseJSON(content) : content;
-
-    } catch (fallbackErr) {
-      const errMsg = `Both AI models failed in ${mod}. Primary: ${primaryErr.message}. Fallback: ${fallbackErr.message}`;
-
-      logActivity({
-        category: 'error',
-        level: 'error',
-        message: errMsg,
-        detail: { module: mod, primary_error: primaryErr.message, fallback_error: fallbackErr.message }
-      }).catch(() => {});
-
-      sendAlert(
-        `ORACLE CRITICAL ERROR\n\nBoth AI models failed in module: ${mod}\n\nPrimary (${PRIMARY_MODEL}): ${primaryErr.message}\nFallback (${FALLBACK_MODEL}): ${fallbackErr.message}\n\nPipeline has paused. Check AgentRouter credits and try again.`
-      );
-
-      throw new Error(errMsg);
-    }
+    throw new Error(errMsg);
   }
-}
 
-/**
- * Fire-and-forget Telegram alert — dynamic import avoids circular dependencies.
- */
-function sendAlert(message) {
-  import('../telegram/bot.js')
-    .then(({ sendTelegram }) => sendTelegram(message))
-    .catch(() => {});
+  const { content, error } = extractContent(response);
+
+  if (error) {
+    await logActivity({
+      category: 'error',
+      level: 'error',
+      message: `Malformed response from Kimi K2.5 in ${moduleName}`,
+      detail: { error, module: moduleName }
+    });
+
+    await sendTelegramAlert(
+      `ORACLE ERROR\n\nModule: ${moduleName}\nModel: ${MODEL}\nMalformed response: ${error}\n\nCheck NVIDIA NIM status.`
+    );
+
+    throw new Error(error);
+  }
+
+  await logActivity({
+    category: 'system',
+    level: 'info',
+    message: `Kimi K2.5 call successful in ${moduleName}`,
+    detail: {
+      module: moduleName,
+      model: MODEL,
+      tokens_used: response.usage?.total_tokens || 'unknown',
+      finish_reason: response.choices[0]?.finish_reason
+    }
+  });
+
+  return expectJSON ? sanitiseJSON(content) : content;
 }
 
 /**
  * Strip markdown fences and parse JSON safely.
  */
 function sanitiseJSON(raw) {
+  if (!raw) throw new Error('Kimi K2.5 returned empty content — cannot parse JSON');
+
   const stripped = raw
     .replace(/```json\s*/gi, '')
     .replace(/```\s*/g, '')
@@ -156,22 +168,15 @@ function sanitiseJSON(raw) {
     return JSON.parse(stripped);
   } catch {
     const match = stripped.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
-    if (match) return JSON.parse(match[0]);
-    throw new Error(`Failed to parse AI response as JSON: ${stripped.slice(0, 200)}`);
+    if (match) {
+      try {
+        return JSON.parse(match[0]);
+      } catch {
+        // fall through
+      }
+    }
+    throw new Error(
+      `Failed to parse Kimi K2.5 response as JSON. First 300 chars: ${stripped.slice(0, 300)}`
+    );
   }
-}
-
-function isCreditsError(err) {
-  const msg = (err.message || '').toLowerCase();
-  const status = err.status || err.statusCode;
-  return status === 402 ||
-    msg.includes('credit') ||
-    msg.includes('quota') ||
-    msg.includes('insufficient') ||
-    msg.includes('balance is too low') ||
-    msg.includes('billing');
-}
-
-function isRateLimitError(err) {
-  return err.status === 429 || (err.message || '').includes('rate limit');
 }

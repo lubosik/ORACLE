@@ -4,6 +4,67 @@ import { logActivity } from '../utils/activity.js';
 import logger from '../utils/logger.js';
 import 'dotenv/config';
 
+const ALLOWED_PERSON_STATES = [
+  'California',
+  'New York',
+  'Texas',
+  'Florida',
+  'Ontario'
+];
+
+/**
+ * Filter a list of states to only those the Apify actor accepts.
+ * Logs a warning for any invalid states so they are visible in the activity feed.
+ * Returns at least one valid state — defaults to California if nothing valid found.
+ */
+async function resolvePersonStates(requestedStates, pipelineRunId) {
+  if (!requestedStates || requestedStates.length === 0) {
+    return ['California'];
+  }
+
+  const valid = [];
+  const invalid = [];
+
+  for (const state of requestedStates) {
+    if (ALLOWED_PERSON_STATES.includes(state)) {
+      valid.push(state);
+    } else {
+      const corrected = ALLOWED_PERSON_STATES.find(
+        s => s.toLowerCase() === state.toLowerCase()
+      );
+      if (corrected) {
+        valid.push(corrected);
+        await logActivity({
+          category: 'scraping',
+          level: 'warning',
+          message: `personState "${state}" corrected to "${corrected}" for Apify actor`,
+          pipeline_run_id: pipelineRunId
+        });
+      } else {
+        invalid.push(state);
+        await logActivity({
+          category: 'scraping',
+          level: 'warning',
+          message: `personState "${state}" is not valid for this Apify actor and was removed. Allowed values: ${ALLOWED_PERSON_STATES.join(', ')}`,
+          pipeline_run_id: pipelineRunId
+        });
+      }
+    }
+  }
+
+  if (valid.length === 0) {
+    await logActivity({
+      category: 'scraping',
+      level: 'warning',
+      message: `No valid personState values found in [${requestedStates.join(', ')}]. Defaulting to California.`,
+      pipeline_run_id: pipelineRunId
+    });
+    return ['California'];
+  }
+
+  return valid;
+}
+
 function getCompanySizeBucket(count) {
   if (!count || count <= 0) return 'unknown';
   if (count <= 10)   return 'micro';
@@ -91,8 +152,10 @@ export async function scrapeLeads(vertical = 'real_estate', geoTarget = null) {
       delete input.personState;
     }
     // State-level targeting (US)
+    // resolvePersonStates filters to only values accepted by this Apify actor.
+    // States like Georgia, Colorado, Illinois etc. will be dropped with a warning.
     if (geoTarget.state) {
-      input.personState = [geoTarget.state];
+      input.personState = await resolvePersonStates([geoTarget.state], null);
       delete input.personCity;
     }
   }

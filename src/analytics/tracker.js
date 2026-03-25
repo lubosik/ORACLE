@@ -1,5 +1,6 @@
 import { supabase } from '../utils/supabase.js';
 import { setSetting } from '../utils/settings.js';
+import { callAI } from '../utils/ai_client.js';
 import logger from '../utils/logger.js';
 import 'dotenv/config';
 
@@ -76,6 +77,109 @@ export async function getCampaignStepAnalytics(campaignId) {
 
 export async function getOverviewAnalytics() {
   return instantlyGet('/campaigns/analytics/overview');
+}
+
+/**
+ * Fetch the last 50 replies per active campaign, classify each with Kimi K2.5,
+ * and store results in reply_sentiment. Returns aggregated counts for hypothesis context.
+ */
+export async function classifyRecentReplies() {
+  try {
+    logger.info('Reply sentiment classification starting');
+
+    const campaigns = await instantlyGet('/campaigns?limit=100');
+    const campaignList = campaigns.items || campaigns || [];
+
+    let totalClassified = 0;
+
+    for (const campaign of campaignList) {
+      try {
+        // ue_type=3 filters for replies in Instantly API
+        const repliesData = await instantlyGet(`/emails?campaign_id=${campaign.id}&ue_type=3&limit=50`);
+        const replies = repliesData.items || repliesData || [];
+
+        for (const reply of replies) {
+          const body = reply.body || reply.email_body || reply.message || '';
+          if (!body || body.length < 5) continue;
+
+          // Skip if already classified
+          const { data: existing } = await supabase
+            .from('reply_sentiment')
+            .select('id')
+            .eq('campaign_id', campaign.id)
+            .eq('lead_email', reply.from_address || reply.lead_email || '')
+            .limit(1);
+
+          if (existing?.length) continue;
+
+          try {
+            const classification = await callAI({
+              messages: [{
+                role: 'user',
+                content: `You are classifying cold email replies for an outbound campaign.
+Classify this reply into one of these categories:
+- "interested": they want to know more, they asked a question, they said yes
+- "objection_timing": not now, try later, busy right now
+- "objection_relevance": not relevant for us, wrong industry, wrong person
+- "objection_trust": sounds too good to be true, not sure this is real
+- "unsubscribe": stop emailing me, remove me, not interested
+- "auto_reply": out of office, automated response
+
+Reply text: ${body.slice(0, 500)}
+
+Return only valid JSON: { "sentiment": "...", "key_phrase": "the most telling phrase from the reply in under 8 words" }`
+              }],
+              maxTokens: 200,
+              temperature: 0.3,
+              module: 'reply_classifier',
+              expectJSON: true
+            });
+
+            const validSentiments = ['interested', 'objection_timing', 'objection_relevance', 'objection_trust', 'unsubscribe', 'auto_reply'];
+            if (!validSentiments.includes(classification.sentiment)) continue;
+
+            await supabase.from('reply_sentiment').insert({
+              campaign_id: campaign.id,
+              lead_email: reply.from_address || reply.lead_email || '',
+              reply_snippet: body.slice(0, 300),
+              sentiment: classification.sentiment,
+              key_phrase: classification.key_phrase || '',
+              email_step: reply.sequence_step || null
+            });
+
+            totalClassified++;
+          } catch (classifyErr) {
+            logger.warn('Failed to classify reply', { campaign_id: campaign.id, error: classifyErr.message });
+          }
+        }
+      } catch (campaignErr) {
+        logger.warn('Failed to fetch replies for campaign', { campaign_id: campaign.id, error: campaignErr.message });
+      }
+    }
+
+    // Aggregate counts and store for hypothesis context
+    const { data: sentimentCounts } = await supabase
+      .from('reply_sentiment')
+      .select('sentiment')
+      .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+
+    const aggregated = {};
+    for (const row of sentimentCounts || []) {
+      aggregated[row.sentiment] = (aggregated[row.sentiment] || 0) + 1;
+    }
+
+    await setSetting('reply_sentiment_summary', JSON.stringify({
+      week_counts: aggregated,
+      computed_at: new Date().toISOString()
+    }));
+
+    logger.info('Reply sentiment classification complete', { classified: totalClassified, aggregated });
+    return aggregated;
+
+  } catch (err) {
+    logger.error('classifyRecentReplies error', { error: err.message });
+    return null;
+  }
 }
 
 // Collects day-of-week performance data across all campaigns.

@@ -8,11 +8,19 @@ process.on('uncaughtException', (err) => {
 process.on('unhandledRejection', (reason) => {
   console.error('[ORACLE] unhandledRejection — process kept alive:', reason);
 });
+
+// Graceful shutdown: stop Telegram polling before Railway kills the old container.
+// This prevents 409 Conflict errors during rolling deployments.
+process.on('SIGTERM', async () => {
+  console.log('[ORACLE] SIGTERM received — stopping Telegram polling before exit');
+  await stopTelegramBot();
+  process.exit(0);
+});
 import { runPipeline } from './src/pipeline/index.js';
 import { runExperimentLoop, scoreActiveExperiments } from './src/loop/experiment.js';
-import { pollAnalytics } from './src/analytics/tracker.js';
+import { pollAnalytics, classifyRecentReplies } from './src/analytics/tracker.js';
 import { startDashboard } from './src/dashboard/server.js';
-import { startTelegramBot } from './src/telegram/bot.js';
+import { startTelegramBot, stopTelegramBot } from './src/telegram/bot.js';
 import { isOracleEnabled, getSetting } from './src/utils/settings.js';
 import { logActivity } from './src/utils/activity.js';
 import { supabase } from './src/utils/supabase.js';
@@ -29,6 +37,7 @@ import { analyzeCohorts } from './src/loop/cohort_analyzer.js';
 import { proposeVerticalExpansion } from './src/loop/vertical_researcher.js';
 import { checkForEarlyAbort } from './src/loop/early_abort.js';
 import { registerWebhooks } from './src/pipeline/launcher.js';
+import { runMetaAdsPipeline } from './src/pipeline/meta_ads_pipeline.js';
 
 // Dashboard and Telegram always run regardless of engine state
 startDashboard();
@@ -61,15 +70,37 @@ cron.schedule('0 */4 * * *', async () => {
   await checkForEarlyAbort();
 });
 
-// Score experiments + generate next hypothesis: every 6 hours
-cron.schedule('0 */6 * * *', async () => {
+// Weekly experiment cycle: every Sunday at 23:00 UTC
+// Pull analytics, classify replies, score experiments, generate next hypothesis
+cron.schedule('0 23 * * 0', async () => {
   if (!(await isOracleEnabled())) {
-    logger.info('ORACLE is OFF — experiment loop skipped');
+    logger.info('ORACLE is OFF — weekly experiment cycle skipped');
     return;
   }
-  logger.info('Running experiment scoring and loop');
+
+  await logActivity({
+    category: 'experiment',
+    level: 'info',
+    message: 'Weekly experiment cycle starting'
+  });
+
+  // Step 1: Pull analytics for all active campaigns from Instantly
+  await pollAnalytics();
+
+  // Step 2: Pull and classify replies from the past 7 days
+  await classifyRecentReplies();
+
+  // Step 3: Score any running experiments that have hit the minimum send threshold
   await scoreActiveExperiments();
+
+  // Step 4: Run the hypothesis loop — propose, build variant, queue for next pipeline run
   await runExperimentLoop();
+
+  await logActivity({
+    category: 'experiment',
+    level: 'info',
+    message: 'Weekly experiment cycle complete'
+  });
 });
 
 // Analytics polling: every 2 hours
@@ -158,6 +189,23 @@ cron.schedule('0 5 * * 0', async () => {
   if (!(await isOracleEnabled())) return;
   logger.info('Running vertical expansion research');
   await proposeVerticalExpansion();
+});
+
+// Meta Ads pipeline: every Tuesday and Thursday at 02:00 UTC
+// Separate schedule from LinkedIn pipeline (which runs at 01:00 UTC daily)
+cron.schedule('0 2 * * 2,4', async () => {
+  if (!(await isOracleEnabled())) {
+    logger.info('ORACLE is OFF — Meta Ads pipeline skipped');
+    return;
+  }
+
+  await logActivity({
+    category: 'pipeline',
+    level: 'info',
+    message: 'Meta Ads pipeline triggered by cron'
+  });
+
+  await runMetaAdsPipeline(crypto.randomUUID());
 });
 
 logger.info('ORACLE is watching. The crystal ball is spinning.');

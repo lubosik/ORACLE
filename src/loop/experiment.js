@@ -42,7 +42,11 @@ export async function runExperimentLoop() {
       winnerSynthesis
     };
 
-    const hypothesis = await generateHypothesis(ledger, baseline, timingInsights, currentSchedule, intelligence);
+    // Load reply sentiment summary from the weekly classification pass
+    const sentimentRaw = await getSetting('reply_sentiment_summary', null);
+    const sentimentSummary = sentimentRaw ? JSON.parse(sentimentRaw) : null;
+
+    const hypothesis = await generateHypothesis(ledger, baseline, timingInsights, currentSchedule, intelligence, sentimentSummary);
 
     // If this is a schedule experiment, temporarily apply the proposed schedule
     // and store the original so we can revert if it loses
